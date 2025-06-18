@@ -270,6 +270,13 @@ def keyboard_test_screen():
     ctrl_pressed = False
     alt_pressed = False
 
+    required_keys = set()
+    for row in keyboard_layout:
+        for key in row:
+            if key["key"] not in ["Fn", "win"]:  
+                required_keys.add(key["key"])
+
+
 
     while running:
         # Handle Pygame events
@@ -367,6 +374,27 @@ def keyboard_test_screen():
                             pressed_keys.remove("prtscr")
         except BlockingIOError:
             pass  # Ignore when no events are available
+
+
+        if required_keys.issubset(highlighted_keys):
+            
+            for row in keyboard_layout:
+                for key in row:
+                    if key["key"] in required_keys:
+                        
+                        pygame.draw.rect(screen, GOOD_COLOR, key["rect"], border_radius=3)
+                        pygame.draw.rect(screen, (30, 30, 30), key["rect"], 1, border_radius=3)
+                        text_surf = font_medium.render(key["label"], True, (0, 0, 0))
+                        text_rect = text_surf.get_rect(center=key["rect"].center)
+                        screen.blit(text_surf, text_rect)
+            
+            
+            message = font_large.render("ALL KEYS TESTED! EXITING...", True, GOOD_COLOR)
+            screen.blit(message, (WIDTH//2 - message.get_width()//2, HEIGHT//2))
+            pygame.display.flip()
+            pygame.time.delay(2000)  
+            running = False
+            break
 
         draw_keyboard(pressed_keys, highlighted_keys, pressed_history, caps_lock_on)
         clock.tick(30)
