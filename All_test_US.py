@@ -18,7 +18,7 @@ def run_system_update():
 def run_key_board():
     """Run sensor monitor"""
     print("\nStarting Key_Board_Test...")
-    subprocess.run(["sudo", "install", "evdev", "--break-system-packages"])
+    subprocess.run(["sudo", "pip3", "install", "evdev", "--break-system-packages"])
     subprocess.run(["python3", "argon-scripts/Argon_Notebook_Test-main/Key_Board_US.py"])
     return True
 
