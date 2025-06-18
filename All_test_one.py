@@ -18,13 +18,14 @@ def run_system_update():
 def run_key_board():
     """Run sensor monitor"""
     print("\nStarting Key_Board_Test...")
-    subprocess.run(["python3", "Desktop/Notebook_Test/Key_Board_UK.py"])
+    subprocess.run(["sudo", "pip3", "install", "evdev", "--break-system-packages"])
+    subprocess.run(["python3", "Desktop/Argon_Notebook_Test-main/Key_Board_UK.py"])
     return True
 
 def run_screen_rgb():
     """Run Screen RGB Detection"""
     print("\nStarting Screen RGB ...")
-    subprocess.run(["python3", "Desktop/Notebook_Test/Screen_Color.py"])
+    subprocess.run(["python3", "Desktop/Argon_Notebook_Test-main/Screen_Color.py"])
     return True
 
 def run_camera():
@@ -47,13 +48,13 @@ def run_brightness():
     """run_brightness"""
     print("\nrun_brightness information:")
     subprocess.run(["sudo", "apt", "install", "-y", "ddcui", "ddcutil"])
-    subprocess.run(["sudo", "python3", "Desktop/Notebook_Test/KEY_Light_init.py"])
+    subprocess.run(["sudo", "python3", "Desktop/Argon_Notebook_Test-main/KEY_Light_init.py"])
     return True
 
 def run_electricity_power():
     """run_electricity power"""
     print("\nrun_electricity power information:")
-    subprocess.run(["python3", "Desktop/Notebook_Test/CW2217_one.py"])
+    subprocess.run(["python3", "Desktop/Argon_Notebook_Test-main/CW2217_one.py"])
     return True
     
  
@@ -65,12 +66,11 @@ def exit_program():
 def run_all_tests():
     """Run all tests sequentially and report results"""
     test_cases = [
-        ("System Update", run_system_update),
+
         ("Keyboard Detection", run_key_board),
         ("Screen RGB Detection", run_screen_rgb),
         ("Camera Detection", run_camera),
         ("Recording Playback Detection", run_recording_playback),
- #       ("Brightness Detection", run_brightness),
         ("Electricity Power Detection", run_electricity_power)
     ]
     
