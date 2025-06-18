@@ -46,7 +46,7 @@ def create_systemd_service():
         home_dir = user_info.pw_dir
         
         # Default script path
-        script_path = os.path.join(home_dir, "Desktop", "Notebook_Test", "KEY_Light.py")
+        script_path = os.path.join(home_dir, "Desktop", "Argon_Notebook_Test-main", "KEY_Light.py")
         
         # User confirmation for script path
         print(f"Detected user: {current_user}")
