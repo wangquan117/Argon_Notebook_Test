@@ -48,7 +48,7 @@ def run_brightness():
     """run_brightness"""
     print("\nrun_brightness information:")
     subprocess.run(["sudo", "apt", "install", "-y", "ddcui", "ddcutil"])
-    subprocess.run(["sudo", "python3", "Desktop/Notebook_Test/KEY_Light_init.py"])
+    subprocess.run(["sudo", "python3", "argon-scripts/Argon_Notebook_Test-main/KEY_Light_init.py"])
     return True
 
 def run_electricity_power():
