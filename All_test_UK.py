@@ -247,6 +247,18 @@ def run_electricity_power(stop_event=None):
     except Exception as e:
         return f"run_electricity_power____NO: {str(e)}"
 
+def run_flow_light(stop_event=None):
+    """Run flow light"""
+    print("\nrun_flow light information:", flush=True)
+    try:
+        script_path = "argon-scripts/Argon_Notebook_Test-main/Flow_Light.py"
+        if not os.path.exists(script_path):
+            raise Exception(f"{script_path} not found. Please check the directory.")
+        subprocess.run(["python3", script_path], check=True)
+        return "run_flow light____YES"
+    except Exception as e:
+        return f"run_flow light____NO: {str(e)}"
+
 def exit_program():
     """Exit the program"""
     print("\nThank you for using the Argon_One_Test Toolkit!", flush=True)
@@ -369,6 +381,7 @@ def main_menu():
         "1. System Update".ljust(40),
         "2. Run ALL Tests Sequentially".ljust(40),
         "3. Brightness Detection".ljust(40),
+        "4. Flow Light Detection".ljust(40),
         "0. Exit".ljust(40),
         "=" * 40,
         "",
@@ -391,6 +404,7 @@ def main_menu():
         '1': run_system_update,
         '2': run_all_tests,
         '3': run_brightness,
+        '4': run_flow_light,
         '0': exit_program
     }
     
