@@ -408,16 +408,23 @@ def main():
     clock = pygame.time.Clock()
     running = True
 
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-        keyboard_test_screen()
-        running = False
-
-    pygame.quit()
-    sys.exit(0)
+    try:
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+            keyboard_test_screen()
+            running = False
+    except KeyboardInterrupt:
+        print("Keyboard test interrupted by Ctrl+C, exiting gracefully...", flush=True)
+    finally:
+#        pygame.quit()
+        try:
+            device.ungrab()
+        except OSError as e:
+            print(f"Warning: Failed to ungrab device: {e}", flush=True)
+        print("Keyboard test completed successfully!", flush=True)
+        sys.exit(0)  # Ensure exit code 0
 
 if __name__ == "__main__":
     main()    
