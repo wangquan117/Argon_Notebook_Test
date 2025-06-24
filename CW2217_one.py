@@ -1,5 +1,6 @@
 import smbus
 import time
+import os
 from datetime import datetime 
 import subprocess
 
@@ -18,12 +19,20 @@ R_SENSE = 10.0
 
 def check_initialization(bus):
     try:
+        
         control_val = bus.read_byte_data(CW2217_ADDRESS, CONTROL_REG)
-        print(f"CONTROL_REG value: 0x{control_val:02X}")
-        return control_val != 0x00
+        print(f"CONTROL_REG (0x08) value: 0x{control_val:02X}")
+        
+   
+        reg_0x0b_val = bus.read_byte_data(CW2217_ADDRESS, 0x0B)
+        print(f"Register 0x0B value: 0x{reg_0x0b_val:02X}")
+
+        return control_val != 0x00 or reg_0x0b_val != 0x80
     except Exception as e:
-        print(f"Error reading CONTROL_REG: {e}")
+        print(f"Error reading registers: {e}")
+
         return True
+
 
 def initialize_cw2217(bus):
     try:
@@ -33,6 +42,7 @@ def initialize_cw2217(bus):
         time.sleep(0.5)  
         bus.write_byte_data(CW2217_ADDRESS, CONTROL_REG, 0x00)
         time.sleep(0.5)  
+        
         bus.write_byte_data(CW2217_ADDRESS, 0x0b, 0x80)
         time.sleep(0.5)  
         print("CW2217 initialized successfully")
@@ -41,22 +51,27 @@ def initialize_cw2217(bus):
 
 def read_data(bus):
     try:
+         
         vcell_high = bus.read_byte_data(CW2217_ADDRESS, VCELL_HIGH_REG)
         vcell_low = bus.read_byte_data(CW2217_ADDRESS, VCELL_LOW_REG)
         voltage = ((((vcell_high << 8) | vcell_low) & 0x3FFF) * 0.0003125)*3
 
+        
         soc_high = bus.read_byte_data(CW2217_ADDRESS, SOC_HIGH_REG)
         soc_low = bus.read_byte_data(CW2217_ADDRESS, SOC_LOW_REG)
         soc_raw = soc_high + (soc_low / 256.0)
         soc = min(max(soc_raw, 0.0), 100.0)
 
+        
         temp = bus.read_byte_data(CW2217_ADDRESS, TEMP_REG)
         temp_c = -40 + (temp / 2)
 
+        
         current_msb = bus.read_byte_data(CW2217_ADDRESS, CURRENT_MSB_REG)
         current_lsb = bus.read_byte_data(CW2217_ADDRESS, CURRENT_LSB_REG)
         raw_current = int.from_bytes([current_msb, current_lsb], byteorder='big', signed=True)
         current = (52.4 * raw_current) / (32768 * R_SENSE)
+
         
         return voltage, soc, temp_c, current
         
@@ -69,9 +84,13 @@ def main():
         bus = smbus.SMBus(I2C_BUS)
         if check_initialization(bus):
             print("CW2217 requires initialization")
-            power_script = "/home/user/Desktop/power.sh"
+            
+            
+            home_dir = os.path.expanduser("~")
+            power_script = os.path.join(home_dir, "argon-scripts", "Argon_Notebook_Test-main", "power.sh")
             print(f"Executing power script: {power_script}")
             try:
+                
                 subprocess.run(['bash', power_script], check=True)
                 print("Power script executed successfully")
             except subprocess.CalledProcessError as e:
@@ -80,6 +99,8 @@ def main():
                 print(f"Script not found at {power_script}")
             except Exception as e:
                 print(f"Error executing power script: {e}")
+            
+           
             initialize_cw2217(bus)
             time.sleep(3)  
         else:
@@ -87,6 +108,7 @@ def main():
         
         for i in range(3):
             voltage, soc, temp_c, current = read_data(bus)
+            
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             
             if voltage is not None:
@@ -100,8 +122,6 @@ def main():
                 print("Failed to read data")
                 
             time.sleep(1)  
-            
-        print("\nCompleted 3 readings. Exiting...")
             
     except KeyboardInterrupt:
         print("\nStopped by user")
