@@ -264,6 +264,14 @@ def exit_program():
     print("\nThank you for using the Argon_One_Test Toolkit!", flush=True)
     sys.exit(0)
 
+def colorize_result(result):
+    if "____YES" in result:
+        return f"\033[32m{result}\033[0m"  
+    elif "____NO" in result:
+        return f"\033[31m{result}\033[0m"  
+    else:
+        return result 
+
 def print_test_results(test_cases, results):
     """Print test results"""
     print("\n" + "="*50, flush=True)
@@ -289,9 +297,12 @@ def print_test_results(test_cases, results):
     print("\nIndividual Test Results:", flush=True)
     for name, result in results:
         if isinstance(result, tuple):
-            print(f"  {result[0]}", flush=True)
+            colored_result = colorize_result(result[0])
+            print(f"  {colored_result}", flush=True)
         else:
-            print(f"  {result}", flush=True)
+            colored_result = colorize_result(result)
+            print(f"  {colored_result}", flush=True)
+
 
 def run_all_tests():
     """Run all tests sequentially and report results"""
