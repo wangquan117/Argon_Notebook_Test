@@ -8,7 +8,6 @@ import select
 import signal
 import shutil
 
-
 exit_program_event = threading.Event()
 
 def clear_screen():
@@ -35,12 +34,10 @@ signal.signal(signal.SIGINT, signal_handler)
 
 def input_with_timeout(prompt, timeout=10):
     print(prompt, end='', flush=True)
-
     try:
         subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as e:
         print(f"Failed to restore terminal: {e}", flush=True)
-    
     start_time = time.time()
     while time.time() - start_time < timeout:
         if exit_program_event.is_set():
@@ -78,7 +75,6 @@ def check_dependencies():
         subprocess.run(["which", "ddcutil"], check=True, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         missing.append("ddcutil (install with: sudo apt install -y ddcutil)")
-    
     if missing:
         print("\nMissing dependencies:", flush=True)
         for dep in missing:
@@ -88,6 +84,45 @@ def check_dependencies():
         return choice == 'y'
     return True
     
+
+def run_media_recording(stop_event):
+    print("\nStarting media recording (audio and video) for 10 seconds...", flush=True)
+    try:
+        display = os.environ.get('DISPLAY')
+        if not display:
+            raise Exception("No display available (DISPLAY not set). Set it with: export DISPLAY=:0")
+        if not os.path.exists("/dev/video0"):
+            raise Exception("/dev/video0 not found. Check camera connection or load v4l2loopback.")
+        print(f"Using display: {display}", flush=True)
+
+        output_file = "recorded_media.mp4"
+        if os.path.exists(output_file):
+            os.remove(output_file)
+
+        # Record audio and video for 10 seconds
+        ffmpeg_process = subprocess.Popen(
+            ["ffmpeg", "-y", "-f", "v4l2", "-i", "/dev/video0", "-f", "alsa", "-i", "default", "-t", "10", output_file],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True
+        )
+        ffmpeg_process.wait()
+
+        print("\nRecording completed. Starting playback...", flush=True)
+        # Playback the recorded video
+        ffplay_process = subprocess.Popen(
+            ["ffplay", "-autoexit", output_file],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True
+        )
+        ffplay_process.wait()
+
+        return "run_media_recording____YES"
+    except Exception as e:
+        stop_event.set()
+        return f"run_media_recording____NO: {str(e)}"
+        
 def run_system_update():
     """Run system update"""
     print("\nUpdating system...", flush=True)
@@ -129,7 +164,7 @@ def run_key_board(stop_event=None):
             return f"run_key_board____NO: Exit code {result.returncode}"
     except Exception as e:
         print(f"Error running keyboard test: {str(e)}", flush=True)
-        return f"run_key_board____NO: {str(e)}"
+        return f"run_key_board____NO: {str(e)}"        
 
 def run_screen_rgb(stop_event=None):
     """Run Screen RGB Detection"""
@@ -179,7 +214,7 @@ def run_camera(stop_event):
     except Exception as e:
         stop_event.set()
         return f"run_camera____NO: {str(e)}"
-
+        
 def run_recording_playback(stop_event):
     print("\nrun_Recording information:", flush=True)
     try:
@@ -220,7 +255,7 @@ def run_recording_playback(stop_event):
     except Exception as e:
         stop_event.set()
         print(f"Error in run_recording_playback: {str(e)}", flush=True)
-        return f"run_recording_playback____NO: {str(e)}"
+        return f"run_recording_playback____NO: {str(e)}"  
         
 def run_brightness():
     """Run brightness"""
@@ -233,7 +268,7 @@ def run_brightness():
         subprocess.run(["sudo", "python3", script_path], check=True)
         return "run_brightness____YES"
     except Exception as e:
-        return f"run_brightness____NO: {str(e)}"
+        return f"run_brightness____NO: {str(e)}"              
 
 def run_electricity_power(stop_event=None):
     """Run electricity power"""
@@ -263,7 +298,7 @@ def exit_program():
     """Exit the program"""
     print("\nThank you for using the Argon_One_Test Toolkit!", flush=True)
     sys.exit(0)
-
+    
 def colorize_result(result):
     if "____YES" in result:
         return f"\033[32m{result}\033[0m"  
@@ -303,15 +338,13 @@ def print_test_results(test_cases, results):
             colored_result = colorize_result(result)
             print(f"  {colored_result}", flush=True)
 
-
 def run_all_tests():
     """Run all tests sequentially and report results"""
     test_cases = [
         ("Keyboard Detection", run_key_board),
         ("Screen RGB Detection", run_screen_rgb),
         ("Electricity Power Detection", run_electricity_power),
-        ("Camera Test", run_camera),
-        ("Recording Playback Test", run_recording_playback),
+        ("Media Recording Test", run_media_recording),
     ]
     results = []
     threads = []
@@ -341,6 +374,7 @@ def run_all_tests():
         thread.daemon = True
         threads.append(thread)
         thread.start()
+
     
     print("\nWaiting for real-time tests to complete. Press 'q' in ffplay to exit, or Enter to continue...", flush=True)
     try:
@@ -355,7 +389,7 @@ def run_all_tests():
         thread.join(timeout=10)  
         if thread.is_alive():
             results.append((test_cases[i+3][0], f"{test_cases[i+3][0]}____NO: Thread timed out"))
-            print(f"Warning: Test {test_cases[i+3][0]} did not terminate in time", flush=True)
+            print(f"Warning: Test { oftest_cases[i+3][0]} did not terminate in time", flush=True)
     
     print("\nCleaning up any remaining processes...", flush=True)
     for cmd in ["arecord", "aplay", "ffmpeg", "ffplay"]:
@@ -382,7 +416,7 @@ def run_all_tests():
     except Exception as e:
         print(f"Error restoring terminal: {e}", flush=True)
     return True
-    
+
 def main_menu():
     clear_screen()
     menu = [
@@ -410,6 +444,7 @@ def main_menu():
     except Exception as e:
         print(f"\nError during input: {e}", flush=True)
         return
+        
     
     menu_options = {
         '1': run_system_update,
@@ -424,7 +459,6 @@ def main_menu():
             if choice != '2':
                 result = menu_options[choice]()
                 print(f"  {result}", flush=True)
-                
                 subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
                 input("\nTest completed. Press Enter to return to the main menu...")
             else:
@@ -432,15 +466,13 @@ def main_menu():
         except Exception as e:
             print(f"\nError during test: {str(e)}", flush=True)
             print(f"Error details: {traceback.format_exc().splitlines()[-1]}", flush=True)
-            
             subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
             input("\nPress Enter to return to the main menu...")
     else:
         print("\nInvalid option, please try again!", flush=True)
-       
         subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
         input("Press Enter to continue...")
 
 if __name__ == "__main__":
     while True:
-        main_menu()                                    
+        main_menu()                    
