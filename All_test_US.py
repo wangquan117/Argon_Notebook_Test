@@ -86,7 +86,8 @@ def check_dependencies():
     
 
 def run_media_recording(stop_event):
-    print("\nStarting media recording (audio and video) for 10 seconds...", flush=True)
+    print("\nStarting media recording (audio and video) for 6 seconds...", flush=True)
+    print("\nAfter the recording is completed, it takes 3 seconds to open the video...", flush=True)
     try:
         display = os.environ.get('DISPLAY')
         if not display:
@@ -101,7 +102,7 @@ def run_media_recording(stop_event):
 
         # Record audio and video for 10 seconds
         ffmpeg_process = subprocess.Popen(
-            ["ffmpeg", "-y", "-f", "v4l2", "-i", "/dev/video0", "-f", "alsa", "-i", "default", "-t", "10", output_file],
+            ["ffmpeg", "-y", "-f", "v4l2", "-i", "/dev/video0", "-f", "alsa", "-i", "default", "-t", "6", output_file],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             close_fds=True
