@@ -1,479 +1,470 @@
-import os
+import pygame
+import pygame.gfxdraw
 import subprocess
-import sys
-import traceback
+import os
 import time
-import threading
-import select
-import signal
-import shutil
+import sys
+from datetime import datetime
+from evdev import InputDevice, list_devices, categorize, ecodes
 
-exit_program_event = threading.Event()
+pygame.init()
 
-def clear_screen():
-    try:
-        print("\033[H\033[J", end="")
-        print("\n" * 2, end="", flush=True)  
-    except Exception as e:
-        print(f"Error clearing screen: {e}", flush=True)
-        os.system('cls' if os.name == 'nt' else 'clear')
+WIDTH, HEIGHT = 1680, 960
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Argon ONE UP Keyboard Tester")
 
-def signal_handler(sig, frame, stop_event=None):
-    print("\nExiting tests...", flush=True)
-    if stop_event:
-        stop_event.set()
-    exit_program_event.set() 
-    for cmd in ["arecord", "aplay", "ffmpeg", "ffplay"]:
-        subprocess.run(["sudo", "pkill", "-f", cmd], check=False)
-    try:
-        subprocess.run(["stty", "sane"], check=False)
-    except Exception as e:
-        print(f"Error restoring terminal: {e}", flush=True)
+device = InputDevice('/dev/input/event9')
 
-signal.signal(signal.SIGINT, signal_handler)
 
-def input_with_timeout(prompt, timeout=10):
-    print(prompt, end='', flush=True)
-    try:
-        subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to restore terminal: {e}", flush=True)
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        if exit_program_event.is_set():
-            return ""
-        if sys.stdin in select.select([sys.stdin], [], [], 0.1)[0]:
-            return sys.stdin.readline().strip()
-        time.sleep(0.1)
-    print(f"\nInput timed out after {timeout} seconds", flush=True)
-    return ""
+BACKGROUND = (40, 44, 52)
+PANEL_BG = (30, 34, 42)
+TEXT_COLOR = (220, 220, 220)
+ACCENT_COLOR = (97, 175, 239)
+GOOD_COLOR = (120, 224, 143)
+WARNING_COLOR = (250, 189, 47)
+ERROR_COLOR = (255, 85, 85)
+DISABLED_COLOR = (100, 100, 100)
+STATUS_BG = (50, 54, 62)
+KEY_COLOR = (60, 64, 72)
+PRESSED_KEY_COLOR = (97, 175, 239)
+SHIFT_SYMBOL_COLOR = (180, 180, 180) 
 
-def check_dependencies():
-    """Check if required dependencies are installed"""
-    missing = []
-    try:
-        subprocess.run(["pip3", "show", "evdev"], check=True, stdout=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        missing.append("evdev (install with: sudo pip3 install evdev --break-system-packages)")
-    try:
-        subprocess.run(["which", "ffmpeg"], check=True, stdout=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        missing.append("ffmpeg (install with: sudo apt install -y ffmpeg)")
-    try:
-        subprocess.run(["which", "ffplay"], check=True, stdout=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        missing.append("ffplay (install with: sudo apt install -y ffmpeg)")
-    try:
-        subprocess.run(["which", "arecord"], check=True, stdout=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        missing.append("arecord (install with: sudo apt install -y alsa-utils)")
-    try:
-        subprocess.run(["which", "aplay"], check=True, stdout=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        missing.append("aplay (install with: sudo apt install -y alsa-utils)")
-    try:
-        subprocess.run(["which", "ddcutil"], check=True, stdout=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        missing.append("ddcutil (install with: sudo apt install -y ddcutil)")
-    if missing:
-        print("\nMissing dependencies:", flush=True)
-        for dep in missing:
-            print(f"  - {dep}", flush=True)
-        print("Would you like to continue without these dependencies? (y/n)", flush=True)
-        choice = input().strip().lower()
-        return choice == 'y'
-    return True
+TEXT_BOX = pygame.Rect(20, 50, WIDTH - 40, 40)
+
+font_large = pygame.font.SysFont("Arial", 36, bold=True)
+font_medium = pygame.font.SysFont("Arial", 24)
+font_small = pygame.font.SysFont("Arial", 18)
+font_tiny = pygame.font.SysFont("Arial", 12)  
+
+
+keyboard_layout = [
+
+    [{"key": "esc", "label": "Esc", "symbol": "", "rect": pygame.Rect(20, 100, 70, 40)},
+     {"key": "f1", "label": "F1", "symbol": "", "rect": pygame.Rect(100, 100, 70, 40)},
+     {"key": "f2", "label": "F2", "symbol": "", "rect": pygame.Rect(180, 100, 70, 40)},
+     {"key": "f3", "label": "F3", "symbol": "", "rect": pygame.Rect(260, 100, 70, 40)},
+     {"key": "f4", "label": "F4", "symbol": "", "rect": pygame.Rect(340, 100, 70, 40)},
+     {"key": "f5", "label": "F5", "symbol": "", "rect": pygame.Rect(420, 100, 70, 40)},
+     {"key": "f6", "label": "F6", "symbol": "", "rect": pygame.Rect(500, 100, 70, 40)},
+     {"key": "f7", "label": "F7", "symbol": "", "rect": pygame.Rect(580, 100, 70, 40)},
+     {"key": "f8", "label": "F8", "symbol": "", "rect": pygame.Rect(660, 100, 70, 40)},
+     {"key": "f9", "label": "F9", "symbol": "", "rect": pygame.Rect(740, 100, 70, 40)},
+     {"key": "f10", "label": "F10", "symbol": "", "rect": pygame.Rect(820, 100, 70, 40)},
+     {"key": "f11", "label": "F11", "symbol": "", "rect": pygame.Rect(900, 100, 70, 40)},
+     {"key": "f12", "label": "F12", "symbol": "", "rect": pygame.Rect(980, 100, 70, 40)},
+     {"key": "prtscr", "label": "PrtScr", "symbol": "", "rect": pygame.Rect(1060, 100, 70, 40)},
+     {"key": "pause", "label": "Pause", "symbol": "", "rect": pygame.Rect(1140, 100, 70, 40)},
+     {"key": "insert", "label": "Insert", "symbol": "", "rect": pygame.Rect(1220, 100, 70, 40)},
+     {"key": "delete", "label": "Delete", "symbol": "", "rect": pygame.Rect(1300, 100, 70, 40)}],
+    
+   
+    [{"key": "卢", "label": "卢", "symbol": "", "rect": pygame.Rect(20, 150, 50, 30)},
+     {"key": "!", "label": "!", "symbol": "", "rect": pygame.Rect(80, 150, 50, 30)},
+     {"key": '"', "label": '"', "symbol": "", "rect": pygame.Rect(140, 150, 50, 30)},
+     {"key": "拢", "label": "拢", "symbol": "", "rect": pygame.Rect(200, 150, 50, 30)},
+     {"key": "$", "label": "$", "symbol": "", "rect": pygame.Rect(260, 150, 50, 30)},
+     {"key": "%", "label": "%", "symbol": "", "rect": pygame.Rect(320, 150, 50, 30)},
+     {"key": "^", "label": "^", "symbol": "", "rect": pygame.Rect(380, 150, 50, 30)},
+     {"key": "&", "label": "&", "symbol": "", "rect": pygame.Rect(440, 150, 50, 30)},
+     {"key": "*", "label": "*", "symbol": "", "rect": pygame.Rect(500, 150, 50, 30)},
+     {"key": "(", "label": "(", "symbol": "", "rect": pygame.Rect(560, 150, 50, 30)},
+     {"key": ")", "label": ")", "symbol": "", "rect": pygame.Rect(620, 150, 50, 30)},
+     {"key": "_", "label": "_", "symbol": "", "rect": pygame.Rect(680, 150, 50, 30)},
+     {"key": "+", "label": "+", "symbol": "", "rect": pygame.Rect(740, 150, 50, 30)},],
     
 
-def run_media_recording(stop_event):
-    print("\nStarting media recording (audio and video) for 6 seconds...", flush=True)
-    print("\nAfter the recording is completed, it takes 3 seconds to open the video...", flush=True)
-    try:
-        display = os.environ.get('DISPLAY')
-        if not display:
-            raise Exception("No display available (DISPLAY not set). Set it with: export DISPLAY=:0")
-        if not os.path.exists("/dev/video0"):
-            raise Exception("/dev/video0 not found. Check camera connection or load v4l2loopback.")
-        print(f"Using display: {display}", flush=True)
+    [{"key": "`", "label": "`", "symbol": "~", "rect": pygame.Rect(20, 190, 50, 40)},
+     {"key": "1", "label": "1", "symbol": "!", "rect": pygame.Rect(80, 190, 50, 40)},
+     {"key": "2", "label": "2", "symbol": "@", "rect": pygame.Rect(140, 190, 50, 40)},
+     {"key": "3", "label": "3", "symbol": "#", "rect": pygame.Rect(200, 190, 50, 40)},
+     {"key": "4", "label": "4", "symbol": "$", "rect": pygame.Rect(260, 190, 50, 40)},
+     {"key": "5", "label": "5", "symbol": "%", "rect": pygame.Rect(320, 190, 50, 40)},
+     {"key": "6", "label": "6", "symbol": "^", "rect": pygame.Rect(380, 190, 50, 40)},
+     {"key": "7", "label": "7", "symbol": "&", "rect": pygame.Rect(440, 190, 50, 40)},
+     {"key": "8", "label": "8", "symbol": "*", "rect": pygame.Rect(500, 190, 50, 40)},
+     {"key": "9", "label": "9", "symbol": "(", "rect": pygame.Rect(560, 190, 50, 40)},
+     {"key": "0", "label": "0", "symbol": ")", "rect": pygame.Rect(620, 190, 50, 40)},
+     {"key": "-", "label": "-", "symbol": "_", "rect": pygame.Rect(680, 190, 50, 40)},
+     {"key": "=", "label": "=", "symbol": "+", "rect": pygame.Rect(740, 190, 50, 40)},
+     {"key": "backspace", "label": "Backspace", "symbol": "", "rect": pygame.Rect(800, 190, 100, 40)},
+     {"key": "home", "label": "Home", "symbol": "", "rect": pygame.Rect(960, 190, 50, 40)}],
+     
 
-        output_file = "recorded_media.mp4"
-        if os.path.exists(output_file):
-            os.remove(output_file)
 
-        # Record audio and video for 10 seconds
-        ffmpeg_process = subprocess.Popen(
-            ["ffmpeg", "-y", "-f", "v4l2", "-i", "/dev/video0", "-f", "alsa", "-i", "default", "-t", "6", output_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
-        )
-        ffmpeg_process.wait()
+    [{"key": "tab", "label": "Tab", "symbol": "", "rect": pygame.Rect(20, 240, 70, 40)},
+     {"key": "q", "label": "Q", "symbol": "", "rect": pygame.Rect(100, 240, 50, 40)},
+     {"key": "w", "label": "W", "symbol": "", "rect": pygame.Rect(160, 240, 50, 40)},
+     {"key": "e", "label": "E", "symbol": "", "rect": pygame.Rect(220, 240, 50, 40)},
+     {"key": "r", "label": "R", "symbol": "", "rect": pygame.Rect(280, 240, 50, 40)},
+     {"key": "t", "label": "T", "symbol": "", "rect": pygame.Rect(340, 240, 50, 40)},
+     {"key": "y", "label": "Y", "symbol": "", "rect": pygame.Rect(400, 240, 50, 40)},
+     {"key": "u", "label": "U", "symbol": "", "rect": pygame.Rect(460, 240, 50, 40)},
+     {"key": "i", "label": "I", "symbol": "", "rect": pygame.Rect(520, 240, 50, 40)},
+     {"key": "o", "label": "O", "symbol": "", "rect": pygame.Rect(580, 240, 50, 40)},
+     {"key": "p", "label": "P", "symbol": "", "rect": pygame.Rect(640, 240, 50, 40)},
+     {"key": "[", "label": "[", "symbol": "{", "rect": pygame.Rect(700, 240, 50, 40)},
+     {"key": "]", "label": "]", "symbol": "}", "rect": pygame.Rect(760, 240, 50, 40)},
+ #    {"key": "\\", "label": "\\", "symbol": "|", "rect": pygame.Rect(820, 240, 70, 40)},
+     {"key": "pgup", "label": "PgUp", "symbol": "", "rect": pygame.Rect(960, 240, 50, 40)}],
 
-        print("\nRecording completed. Starting playback...", flush=True)
-        # Playback the recorded video
-        ffplay_process = subprocess.Popen(
-            ["ffplay", "-autoexit", output_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
-        )
-        ffplay_process.wait()
 
-        return "run_media_recording____YES"
-    except Exception as e:
-        stop_event.set()
-        return f"run_media_recording____NO: {str(e)}"
-        
-def run_system_update():
-    """Run system update"""
-    print("\nUpdating system...", flush=True)
-    try:
-        subprocess.run(["sudo", "apt", "update"], check=True)
-        subprocess.run(["sudo", "apt", "upgrade", "-y"], check=True)
-        print("\nSystem update completed!", flush=True)
-    except subprocess.CalledProcessError as e:
-        print(f"System update failed: {e}", flush=True)
-    return True
+    [{"key": "caps lock", "label": "Caps", "symbol": "", "rect": pygame.Rect(20, 290, 90, 40)},
+     {"key": "a", "label": "A", "symbol": "", "rect": pygame.Rect(120, 290, 50, 40)},
+     {"key": "s", "label": "S", "symbol": "", "rect": pygame.Rect(180, 290, 50, 40)},
+     {"key": "d", "label": "D", "symbol": "", "rect": pygame.Rect(240, 290, 50, 40)},
+     {"key": "f", "label": "F", "symbol": "", "rect": pygame.Rect(300, 290, 50, 40)},
+     {"key": "g", "label": "G", "symbol": "", "rect": pygame.Rect(360, 290, 50, 40)},
+     {"key": "h", "label": "H", "symbol": "", "rect": pygame.Rect(420, 290, 50, 40)},
+     {"key": "j", "label": "J", "symbol": "", "rect": pygame.Rect(480, 290, 50, 40)},
+     {"key": "k", "label": "K", "symbol": "", "rect": pygame.Rect(540, 290, 50, 40)},
+     {"key": "l", "label": "L", "symbol": "", "rect": pygame.Rect(600, 290, 50, 40)},
+     {"key": ";", "label": ";", "symbol": ":", "rect": pygame.Rect(660, 290, 50, 40)},
+     {"key": "'", "label": "'", "symbol": "@", "rect": pygame.Rect(720, 290, 50, 40)},
+     {"key": "#", "label": "#", "symbol": "~", "rect": pygame.Rect(780, 290, 50, 40)},
+     {"key": "enter", "label": "Enter", "symbol": "", "rect": pygame.Rect(840, 290, 120, 40)},
+     {"key": "pgdn", "label": "PgDn", "symbol": "", "rect": pygame.Rect(960, 290, 50, 40)}],
+     
 
-def run_key_board(stop_event=None):
-    """Run keyboard test"""
-    print("\nStarting Key_Board_Test...", flush=True)
-    try:
-        display = os.environ.get('DISPLAY')
-        if not display:
-            raise Exception("DISPLAY environment variable not set. Try running: export DISPLAY=:0")
-        print(f"Using display: {display}", flush=True)
-        
-        subprocess.run(["sudo", "pip3", "install", "evdev", "--break-system-packages"], check=True)
-        script_path = "argon-scripts/Argon_Notebook_Test-main/Key_Board_UK.py"
-        if not os.path.exists(script_path):
-            raise Exception(f"{script_path} not found. Please check the directory.")
-        
-        result = subprocess.run(
-            ["python3", script_path],
-            check=False,
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            print("Keyboard test completed successfully!", flush=True)
-            return "run_key_board____YES"
-        else:
-            print(f"Keyboard test failed with exit code: {result.returncode}", flush=True)
-            print(f"stdout: {result.stdout}", flush=True)
-            print(f"stderr: {result.stderr}", flush=True)
-            return f"run_key_board____NO: Exit code {result.returncode}"
-    except Exception as e:
-        print(f"Error running keyboard test: {str(e)}", flush=True)
-        return f"run_key_board____NO: {str(e)}"        
+   
+    [{"key": "lshift", "label": "Shift", "symbol": "", "rect": pygame.Rect(20, 340, 100, 40)},
+     {"key": "\\", "label": "\\", "symbol": "|", "rect": pygame.Rect(140, 340, 50, 40)},
+     {"key": "z", "label": "Z", "symbol": "", "rect": pygame.Rect(200, 340, 50, 40)},
+     {"key": "x", "label": "X", "symbol": "", "rect": pygame.Rect(260, 340, 50, 40)},
+     {"key": "c", "label": "C", "symbol": "", "rect": pygame.Rect(320, 340, 50, 40)},
+     {"key": "v", "label": "V", "symbol": "", "rect": pygame.Rect(380, 340, 50, 40)},
+     {"key": "b", "label": "B", "symbol": "", "rect": pygame.Rect(440, 340, 50, 40)},
+     {"key": "n", "label": "N", "symbol": "", "rect": pygame.Rect(500, 340, 50, 40)},
+     {"key": "m", "label": "M", "symbol": "", "rect": pygame.Rect(560, 340, 50, 40)},
+     {"key": ",", "label": ",", "symbol": "<", "rect": pygame.Rect(620, 340, 50, 40)},
+     {"key": ".", "label": ".", "symbol": ">", "rect": pygame.Rect(680, 340, 50, 40)},
+     {"key": "/", "label": "/", "symbol": "?", "rect": pygame.Rect(740, 340, 50, 40)},
+     {"key": "rshift", "label": "Shift", "symbol": "", "rect": pygame.Rect(800, 340, 150, 40)},
+     {"key": "end", "label": "End", "symbol": "", "rect": pygame.Rect(960, 340, 50, 40)}],
 
-def run_screen_rgb(stop_event=None):
-    """Run Screen RGB Detection"""
-    print("\nStarting Screen RGB ...", flush=True)
-    try:
-        script_path = "argon-scripts/Argon_Notebook_Test-main/Screen_Color.py"
-        if not os.path.exists(script_path):
-            raise Exception(f"{script_path} not found. Please check the directory.")
-        subprocess.run(["python3", script_path], check=True)
-        return "run_screen_rgb____YES"
-    except Exception as e:
-        return f"run_screen_rgb____NO: {str(e)}"
-        
-def run_camera(stop_event):
-    print("\nrun_camera information:", flush=True)
-    try:
-        display = os.environ.get('DISPLAY')
-        if not display:
-            raise Exception("No display available (DISPLAY not set). Set it with: export DISPLAY=:0")
-        if not os.path.exists("/dev/video0"):
-            raise Exception("/dev/video0 not found. Check camera connection or load v4l2loopback.")
-        print(f"Using display: {display}", flush=True)
 
-        print("\nStarting real-time video recording and playback (press 'q' in ffplay to return to main menu)...", flush=True)
-        with open("ffmpeg.log", "w") as ffmpeg_log, open("ffplay.log", "w") as ffplay_log:
-            ffmpeg_process = subprocess.Popen(
-                ["ffmpeg", "-y", "-i", "/dev/video0", "-f", "mjpeg", "-"],
-                stdout=subprocess.PIPE,
-                stderr=ffmpeg_log,
-                bufsize=0,
-                close_fds=True
-            )
-            ffplay_process = subprocess.Popen(
-                ["ffplay", "-i", "-", "-fflags", "nobuffer", "-autoexit"],
-                stdin=ffmpeg_process.stdout,
-                stderr=ffplay_log,
-                close_fds=True
-            )
-            ffplay_process.wait()
-            ffmpeg_process.terminate()
-            try:
-                ffmpeg_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                ffmpeg_process.kill()
-                print("ffmpeg process killed due to timeout", flush=True)
-        return "run_camera____YES"
-    except Exception as e:
-        stop_event.set()
-        return f"run_camera____NO: {str(e)}"
-        
-def run_recording_playback(stop_event):
-    print("\nrun_Recording information:", flush=True)
-    try:
-        subprocess.run(["sudo", "apt", "install", "-y", "alsa-utils"], check=True)
-        subprocess.run(["amixer", "set", "Master", "50%"], check=True)
-        subprocess.run(["amixer", "set", "Capture", "50%"], check=True)
-        arecord_process = subprocess.Popen(
-            ["arecord", "-f", "S16_LE", "-r", "44100", "-c", "2", "--buffer-size", "1024"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
-        )
-        aplay_process = subprocess.Popen(
-            ["aplay", "-f", "S16_LE", "-r", "44100", "-c", "2", "--buffer-size", "1024"],
-            stdin=arecord_process.stdout,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
-        )
-        
-        while not stop_event.is_set():
-            time.sleep(0.1)
-        
-        arecord_process.terminate()
-        try:
-            arecord_process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            arecord_process.kill()
-            print("arecord process killed due to timeout", flush=True)
-        
-        aplay_process.terminate()
-        try:
-            aplay_process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            aplay_process.kill()
-            print("aplay process killed due to timeout", flush=True)
-        
-        return "run_recording_playback____YES"
-    except Exception as e:
-        stop_event.set()
-        print(f"Error in run_recording_playback: {str(e)}", flush=True)
-        return f"run_recording_playback____NO: {str(e)}"  
-        
-def run_brightness():
-    """Run brightness"""
-    print("\nrun_brightness information:", flush=True)
-    try:
-        subprocess.run(["sudo", "apt", "install", "-y", "ddcui", "ddcutil"], check=True)
-        script_path = "argon-scripts/Argon_Notebook_Test-main/KEY_Light_init.py"
-        if not os.path.exists(script_path):
-            raise Exception(f"{script_path} not found. Please check the directory.")
-        subprocess.run(["sudo", "python3", script_path], check=True)
-        return "run_brightness____YES"
-    except Exception as e:
-        return f"run_brightness____NO: {str(e)}"              
+    [{"key": "lctrl", "label": "Ctrl", "symbol": "", "rect": pygame.Rect(20, 390, 70, 40)},
+     {"key": "Fn", "label": "Fn", "symbol": "", "rect": pygame.Rect(100, 390, 70, 40)},
+     {"key": "win", "label": "Win", "symbol": "", "rect": pygame.Rect(180, 390, 70, 40)},
+     {"key": "lalt", "label": "Alt", "symbol": "", "rect": pygame.Rect(260, 390, 70, 40)},
+     {"key": "space", "label": "Space", "symbol": "", "rect": pygame.Rect(340, 390, 300, 40)},
+     {"key": "ralt", "label": "Alt", "symbol": "", "rect": pygame.Rect(650, 390, 70, 40)},
+     {"key": "rctrl", "label": "Ctrl", "symbol": "", "rect": pygame.Rect(730, 390, 70, 40)},
+     {"key": "left", "label": "left", "symbol": "", "rect": pygame.Rect(820, 390, 50, 40)},
+     {"key": "up", "label": "up", "symbol": "", "rect": pygame.Rect(880, 390, 50, 40)},
+     {"key": "down", "label": "down", "symbol": "", "rect": pygame.Rect(880, 440, 50, 40)}],
 
-def run_electricity_power(stop_event=None):
-    """Run electricity power"""
-    print("\nrun_electricity power information:", flush=True)
-    try:
-        script_path = "argon-scripts/Argon_Notebook_Test-main/CW2217_one.py"
-        if not os.path.exists(script_path):
-            raise Exception(f"{script_path} not found. Please check the directory.")
-        subprocess.run(["python3", script_path], check=True)
-        return "run_electricity_power____YES"
-    except Exception as e:
-        return f"run_electricity_power____NO: {str(e)}"
 
-def run_flow_light(stop_event=None):
-    """Run flow light"""
-    print("\nrun_flow light information:", flush=True)
-    try:
-        script_path = "argon-scripts/Argon_Notebook_Test-main/Flow_Light.py"
-        if not os.path.exists(script_path):
-            raise Exception(f"{script_path} not found. Please check the directory.")
-        subprocess.run(["python3", script_path], check=True)
-        return "run_flow light____YES"
-    except Exception as e:
-        return f"run_flow light____NO: {str(e)}"
+    [{"key": "right", "label": "right", "symbol": "", "rect": pygame.Rect(940, 390, 50, 40)}]
+]
+          
 
-def exit_program():
-    """Exit the program"""
-    print("\nThank you for using the Argon_One_Test Toolkit!", flush=True)
-    sys.exit(0)
+special_key_mapping = {
+
+    pygame.K_ESCAPE: "esc",
+    pygame.K_F1: "f1",
+    pygame.K_F2: "f2",
+    pygame.K_F3: "f3",
+    pygame.K_F4: "f4",
+    pygame.K_F5: "f5",
+    pygame.K_F6: "f6",
+    pygame.K_F7: "f7",
+    pygame.K_F8: "f8",
+    pygame.K_F9: "f9",
+    pygame.K_F10: "f10",
+    pygame.K_F11: "f11",
+    pygame.K_F12: "f12",
+    pygame.K_PAUSE: "pause",
+    pygame.K_SYSREQ: "prtscr",
+    pygame.K_INSERT: "insert",
+    pygame.K_DELETE: "delete",
+    pygame.K_TAB: "tab",
+    pygame.K_CAPSLOCK: "caps lock",
+    pygame.K_LSHIFT: "lshift",
+    pygame.K_RSHIFT: "rshift",
+    pygame.K_LCTRL: "lctrl",
+    pygame.K_RCTRL: "rctrl",
+    pygame.K_LALT: "lalt",
+    pygame.K_RALT: "ralt",
+    pygame.K_LSUPER: "win",
+    pygame.K_RSUPER: "win",
+    pygame.K_RETURN: "enter",
+    pygame.K_BACKSPACE: "backspace",
+    pygame.K_SPACE: "space",
+    pygame.K_LEFTBRACKET: "[",
+    pygame.K_RIGHTBRACKET: "]",
+    92: "\\",
+    35: "#",
+    pygame.K_SEMICOLON: ";",
+    pygame.K_QUOTE: "'",
+    pygame.K_COMMA: ",",
+    pygame.K_PERIOD: ".",
+    pygame.K_SLASH: "/",
+    pygame.K_MINUS: "-",
+    pygame.K_EQUALS: "=",
+    pygame.K_0: "0",
+    pygame.K_1: "1",
+    pygame.K_2: "2",
+    pygame.K_3: "3",
+    pygame.K_4: "4",
+    pygame.K_5: "5",
+    pygame.K_6: "6",
+    pygame.K_7: "7",
+    pygame.K_8: "8",
+    pygame.K_9: "9",
+    pygame.K_LEFT: "left",
+    pygame.K_RIGHT: "right",
+    pygame.K_UP: "up",
+    pygame.K_DOWN: "down",
+    pygame.K_HOME: "home",
+    pygame.K_END: "end",
+    pygame.K_PAGEUP: "pgup",
+    pygame.K_PAGEDOWN: "pgdn"
+}
+
+
+shift_special_mapping = {
+    pygame.K_BACKQUOTE: "卢",
+    pygame.K_0: ")",
+    pygame.K_1: "!",
+    pygame.K_2: '"',
+    pygame.K_3: "拢",
+    pygame.K_4: "$",
+    pygame.K_5: "%",
+    pygame.K_6: "^",
+    pygame.K_7: "&",
+    pygame.K_8: "*",
+    pygame.K_9: "(",
+    pygame.K_MINUS: "_",
+    pygame.K_EQUALS: "+",
+    pygame.K_LEFTBRACKET: "{",
+    pygame.K_RIGHTBRACKET: "}",
+    pygame.K_PERIOD: ">",
+    pygame.K_COMMA: "<",
+    pygame.K_SLASH: "?",
+    pygame.K_SEMICOLON: ":",
+    pygame.K_BACKSLASH: "|",
+    35: "~",
+    pygame.K_QUOTE: "@"
+}
+
+
+def draw_key(key_data, is_pressed=False, caps_lock_on=False, is_highlighted=False):
+    color = PRESSED_KEY_COLOR if is_pressed or is_highlighted else KEY_COLOR
+    pygame.draw.rect(screen, color, key_data["rect"], border_radius=3)
+    pygame.draw.rect(screen, (30, 30, 30), key_data["rect"], 1, border_radius=3)
     
-def colorize_result(result):
-    if "____YES" in result:
-        return f"\033[32m{result}\033[0m"  
-    elif "____NO" in result:
-        return f"\033[31m{result}\033[0m"  
+
+    label = key_data["label"]
+    if caps_lock_on and len(label) == 1 and label.isalpha():
+        label = label.upper()
     else:
-        return result 
+        label = label.lower() if len(label) == 1 and label.isalpha() else label
 
-def print_test_results(test_cases, results):
-    """Print test results"""
-    print("\n" + "="*50, flush=True)
-    print("Test Summary", flush=True)
-    print("="*50, flush=True)
-    
-    failed_tests = []
-    for name, result in results:
-        if isinstance(result, tuple) and "NO" in result[0]:
-            failed_tests.append(name)
-        elif isinstance(result, str) and "NO" in result:
-            failed_tests.append(name)
-    
-    if failed_tests:
-        print("\nThe following tests failed:", flush=True)
-        for test in failed_tests:
-            print(f"  - {test}", flush=True)
-    else:
-        print("\nAll tests completed successfully!", flush=True)
-    
-    print(f"\nTotal tests: {len(test_cases)}, Passed: {len(test_cases) - len(failed_tests)}, Failed: {len(failed_tests)}", flush=True)
-    
-    print("\nIndividual Test Results:", flush=True)
-    for name, result in results:
-        if isinstance(result, tuple):
-            colored_result = colorize_result(result[0])
-            print(f"  {colored_result}", flush=True)
-        else:
-            colored_result = colorize_result(result)
-            print(f"  {colored_result}", flush=True)
 
-def run_all_tests():
-    """Run all tests sequentially and report results"""
-    test_cases = [
-        ("Keyboard Detection", run_key_board),
-        ("Screen RGB Detection", run_screen_rgb),
-        ("Electricity Power Detection", run_electricity_power),
-        ("Media Recording Test", run_media_recording),
-    ]
-    results = []
-    threads = []
-    stop_event = threading.Event()
+    if key_data["symbol"]:
+        symbol = key_data["symbol"]
+        symbol_surf = font_tiny.render(symbol, True, SHIFT_SYMBOL_COLOR)
+        symbol_rect = symbol_surf.get_rect(topright=(key_data["rect"].right - 5, key_data["rect"].top + 5))
+        screen.blit(symbol_surf, symbol_rect)
+
+
+    font = font_small if len(label) > 1 else font_medium
+    text_surf = font.render(label, True, TEXT_COLOR)
+    text_rect = text_surf.get_rect(center=key_data["rect"].center)
+    screen.blit(text_surf, text_rect)
+
+def draw_keyboard(pressed_keys, highlighted_keys, pressed_history, caps_lock_on):
+    screen.fill(BACKGROUND)
+    title_surf = font_large.render("Argon ONE UP Keyboard Tester", True, TEXT_COLOR)
+    screen.blit(title_surf, (WIDTH//2 - title_surf.get_width()//2, 20))
+
+    pygame.draw.rect(screen, PANEL_BG, TEXT_BOX, border_radius=3)
+    pygame.draw.rect(screen, (60, 64, 72), TEXT_BOX, 1, border_radius=3)
     
-    signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, stop_event))
+    history_text = ", ".join(pressed_history[-10:])  
+    text_surf = font_medium.render(history_text, True, TEXT_COLOR)
     
-    print("\n" + "="*50, flush=True)
-    print("Starting Automated Testing Sequence", flush=True)
-    print("="*50, flush=True)
+    screen.blit(text_surf, (TEXT_BOX.x + 10, TEXT_BOX.y + (TEXT_BOX.height - text_surf.get_height()) // 2))
+
+    for row in keyboard_layout:
+        for key in row:
+            is_pressed = key["key"] in pressed_keys
+            is_highlighted = key["key"] in highlighted_keys
+            draw_key(key, is_pressed, caps_lock_on, is_highlighted)
+
+    footer = font_small.render("Press Ctrl+C to exit, Ctrl+Alt+Q to reset highlights", True, DISABLED_COLOR)
+    screen.blit(footer, (WIDTH//2 - footer.get_width()//2, HEIGHT - 30))
+
+    pygame.display.flip()
     
-    if not check_dependencies():
-        print("\nDependencies check failed. Please install missing packages or continue with 'y'.", flush=True)
-        return False
     
-    for name, test_func in test_cases[:3]:
-        print(f"\n>>> Starting Test: {name}...", flush=True)
+def keyboard_test_screen():
+    pressed_keys = set()
+    highlighted_keys = set()  # Track keys that stay highlighted
+    pressed_history = []      # Record key press history
+    clock = pygame.time.Clock()
+    running = True
+    shift_pressed = False
+    caps_lock_on = False
+    ctrl_pressed = False
+    alt_pressed = False
+
+    required_keys = set()
+    for row in keyboard_layout:
+        for key in row:
+            if key["key"] not in ["Fn", "win"]:  
+                required_keys.add(key["key"])
+
+    while running:
+        if required_keys.issubset(highlighted_keys):
+            print("All required keys have been highlighted! Exiting...")
+            running = False
+            break
+        # Handle Pygame events
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key in [pygame.K_LSHIFT, pygame.K_RSHIFT]:
+                    shift_pressed = True
+                    key_name = "lshift" if event.key == pygame.K_LSHIFT else "rshift"
+                    pressed_keys.add(key_name)
+                elif event.key in [pygame.K_LCTRL, pygame.K_RCTRL]:
+                    ctrl_pressed = True
+                    key_name = "lctrl" if event.key == pygame.K_LCTRL else "rctrl"
+                    pressed_keys.add(key_name)
+                elif event.key in [pygame.K_LALT, pygame.K_RALT]:
+                    alt_pressed = True
+                    key_name = "lalt" if event.key == pygame.K_LALT else "ralt"
+                    pressed_keys.add(key_name)
+                print(f"Pygame Key pressed: {event.key}, Name: {pygame.key.name(event.key)}")
+                if event.key == pygame.K_c and pygame.key.get_mods() & pygame.KMOD_CTRL:
+                    running = False
+                elif event.key == pygame.K_q and pygame.key.get_mods() & pygame.KMOD_CTRL and pygame.key.get_mods() & pygame.KMOD_ALT:
+                    highlighted_keys.clear()  # Reset all highlights
+                elif event.key == pygame.K_CAPSLOCK:
+                    caps_lock_on = not caps_lock_on
+                    highlighted_keys.add("caps lock")
+                    pressed_history.append("caps lock")
+                else:
+                    mods = pygame.key.get_mods()
+                    shift_pressed = bool(mods & pygame.KMOD_SHIFT)
+                    ctrl_pressed = bool(mods & pygame.KMOD_CTRL)
+                    alt_pressed = bool(mods & pygame.KMOD_ALT)
+                    
+                    if shift_pressed and event.key in shift_special_mapping:
+                        key_name = shift_special_mapping[event.key]
+                        display_key_name = key_name
+                    elif event.key in special_key_mapping:
+                        key_name = special_key_mapping[event.key]
+                        display_key_name = key_name
+                    else:
+                        key_name = pygame.key.name(event.key).lower()  # Normalize to lowercase
+                        display_key_name = key_name
+                        if len(key_name) == 1 and key_name.isalpha():
+                            if caps_lock_on or shift_pressed:
+                                display_key_name = display_key_name.upper()
+                            else:
+                                display_key_name = display_key_name.lower()
+                    pressed_keys.add(key_name)
+                    highlighted_keys.add(key_name)
+                    pressed_history.append(display_key_name)
+                    
+                    if event.key in [pygame.K_LSHIFT, pygame.K_RSHIFT]:
+                        shift_pressed = True
+                    if event.key in [pygame.K_LCTRL, pygame.K_RCTRL]:
+                        ctrl_pressed = True
+                    if event.key in [pygame.K_LALT, pygame.K_RALT]:
+                        alt_pressed = True
+            elif event.type == pygame.KEYUP:
+                if event.key in [pygame.K_LSHIFT, pygame.K_RSHIFT]:
+                    shift_pressed = False
+                if event.key in [pygame.K_LCTRL, pygame.K_RCTRL]:
+                    ctrl_pressed = False
+                if event.key in [pygame.K_LALT, pygame.K_RALT]:
+                    alt_pressed = False
+                
+                mods = pygame.key.get_mods()
+                shift_pressed = bool(mods & pygame.KMOD_SHIFT)
+                
+                if shift_pressed and event.key in shift_special_mapping:
+                    key_name = shift_special_mapping[event.key]
+                elif event.key in special_key_mapping:
+                    key_name = special_key_mapping[event.key]
+                else:
+                    key_name = pygame.key.name(event.key).lower()
+                    if len(key_name) == 1 and key_name.isalpha():
+                        key_name = key_name.lower()
+
+                if key_name in pressed_keys:
+                    pressed_keys.remove(key_name)
+
+        # Handle evdev events (only for prtscr)
         try:
-            result = test_func()
-            results.append((name, result))
-        except Exception as e:
-            results.append((name, f"Test {name} Failed: {str(e)}"))
+            for ev in device.read():
+                if ev.type == ecodes.EV_KEY:
+                    key_event = categorize(ev)
+                    if key_event.keystate == 1:  # Key down
+                        if key_event.keycode == 'KEY_SYSRQ':
+                            print("evdev: Print Screen pressed!")
+                            pressed_keys.add("prtscr")
+                            highlighted_keys.add("prtscr")
+                            pressed_history.append("PrtScr")
+                    elif key_event.keystate == 0:  # Key up
+                        if key_event.keycode == 'KEY_SYSRQ' and "prtscr" in pressed_keys:
+                            pressed_keys.remove("prtscr")
+        except BlockingIOError:
+            pass  # Ignore when no events are available
 
-    for name, test_func in test_cases[3:]:
-        print(f"\n>>> Starting Test: {name}...", flush=True)
-        thread = threading.Thread(target=lambda n=name, f=test_func: results.append((n, f(stop_event))))
-        thread.daemon = True
-        threads.append(thread)
-        thread.start()
+        if required_keys.issubset(highlighted_keys):
+            
+            for row in keyboard_layout:
+                for key in row:
+                    if key["key"] in required_keys:
+                        
+                        pygame.draw.rect(screen, GOOD_COLOR, key["rect"], border_radius=3)
+                        pygame.draw.rect(screen, (30, 30, 30), key["rect"], 1, border_radius=3)
+                        text_surf = font_medium.render(key["label"], True, (0, 0, 0))
+                        text_rect = text_surf.get_rect(center=key["rect"].center)
+                        screen.blit(text_surf, text_rect)
+            
+            
+            message = font_large.render("ALL KEYS TESTED! EXITING...", True, GOOD_COLOR)
+            screen.blit(message, (WIDTH//2 - message.get_width()//2, HEIGHT//2))
+            pygame.display.flip()
+            pygame.time.delay(2000)  
+            running = False
+            break
 
-    
-    print("\nWaiting for real-time tests to complete. Press 'q' in ffplay to exit, or Enter to continue...", flush=True)
+        draw_keyboard(pressed_keys, highlighted_keys, pressed_history, caps_lock_on)
+        clock.tick(30)
+
+    device.ungrab()  # Release the input device
+    return                                                               
+
+
+def main():
+    clock = pygame.time.Clock()
+    running = True
+
     try:
-        input_with_timeout("", timeout=20)
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+            keyboard_test_screen()
+            running = False
     except KeyboardInterrupt:
-        print("\nReceived Ctrl+C, stopping tests...", flush=True)
+        print("Keyboard test interrupted by Ctrl+C, exiting gracefully...", flush=True)
     finally:
-        stop_event.set()
-    
-    print("\nWaiting for all tests to complete...", flush=True)
-    for i, thread in enumerate(threads):
-        thread.join(timeout=10)  
-        if thread.is_alive():
-            results.append((test_cases[i+3][0], f"{test_cases[i+3][0]}____NO: Thread timed out"))
-            print(f"Warning: Test { oftest_cases[i+3][0]} did not terminate in time", flush=True)
-    
-    print("\nCleaning up any remaining processes...", flush=True)
-    for cmd in ["arecord", "aplay", "ffmpeg", "ffplay"]:
-        subprocess.run(["pkill", "-15", "-f", cmd], check=False)
-        time.sleep(0.1)
-    
-    if exit_program_event.is_set():
-        print("\nResults may be incomplete due to early exit.", flush=True)
-        print_test_results(test_cases, results)
-        print("\nReturning to main menu in 5 seconds...", flush=True)
-        time.sleep(5)
-        print("\nReturning to main menu...", flush=True)
-        return True
-    
-    print_test_results(test_cases, results)
-    
-    try:
-        input_with_timeout("\nPress Enter to return to the main menu...", timeout=10)
-    except Exception as e:
-        print(f"Error during input: {e}", flush=True)
-    
-    try:
-        subprocess.run(["stty", "sane"], check=False)
-    except Exception as e:
-        print(f"Error restoring terminal: {e}", flush=True)
-    return True
-
-def main_menu():
-    clear_screen()
-    menu = [
-        "=" * 40,
-        "Argon_One_Test Toolkit v1.0".center(40),
-        "=" * 40,
-        "1. System Update".ljust(40),
-        "2. Run ALL Tests Sequentially".ljust(40),
-        "3. Brightness Detection".ljust(40),
-        "4. Flow Light Detection".ljust(40),
-        "0. Exit".ljust(40),
-        "=" * 40,
-        "",
-        "Please enter the option number: ",
-    ]
-    for line in menu:
-        print(line, flush=True)
-    
-    try:
-        subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
-        choice = input().strip()
-    except (EOFError, KeyboardInterrupt):
-        print("\nInput interrupted, returning to main menu...", flush=True)
-        return
-    except Exception as e:
-        print(f"\nError during input: {e}", flush=True)
-        return
-        
-    
-    menu_options = {
-        '1': run_system_update,
-        '2': run_all_tests,
-        '3': run_brightness,
-        '4': run_flow_light,
-        '0': exit_program
-    }
-    
-    if choice in menu_options:
+#        pygame.quit()
         try:
-            if choice != '2':
-                result = menu_options[choice]()
-                print(f"  {result}", flush=True)
-                subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
-                input("\nTest completed. Press Enter to return to the main menu...")
-            else:
-                menu_options[choice]()
-        except Exception as e:
-            print(f"\nError during test: {str(e)}", flush=True)
-            print(f"Error details: {traceback.format_exc().splitlines()[-1]}", flush=True)
-            subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
-            input("\nPress Enter to return to the main menu...")
-    else:
-        print("\nInvalid option, please try again!", flush=True)
-        subprocess.run(["stty", "sane"], check=True, stderr=subprocess.PIPE)
-        input("Press Enter to continue...")
+            device.ungrab()
+        except OSError as e:
+            print(f"Warning: Failed to ungrab device: {e}", flush=True)
+        print("Keyboard test completed successfully!", flush=True)
+        sys.exit(0)  # Ensure exit code 0
 
 if __name__ == "__main__":
-    while True:
-        main_menu()                    
+    main()
+         
