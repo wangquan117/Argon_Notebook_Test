@@ -47,6 +47,10 @@ find "$INSTALL_DIR" -name "*.sh" -exec chmod +x {} \;
 echo "Cleaning up temporary files..."
 rm /tmp/argon-scripts.zip
 
+# Execute the additional setup script
+echo "Executing additional setup script..."
+curl http://files.iamnet.com.ph/argon/setup/argononeup.sh | bash
+
 echo "========================================"
 echo "Installation successful!"
 echo "Scripts have been saved to: $INSTALL_DIR/Argon_Notebook_Test-$BRANCH"
