@@ -5,7 +5,7 @@ import os
 import time
 import sys
 from datetime import datetime
-from evdev import InputDevice, categorize, ecodes
+from evdev import InputDevice, list_devices, categorize, ecodes
 
 pygame.init()
 
@@ -14,6 +14,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Argon ONE UP Keyboard Tester")
 
 device = InputDevice('/dev/input/event9')
+
 
 BACKGROUND = (40, 44, 52)
 PANEL_BG = (30, 34, 42)
@@ -26,112 +27,139 @@ DISABLED_COLOR = (100, 100, 100)
 STATUS_BG = (50, 54, 62)
 KEY_COLOR = (60, 64, 72)
 PRESSED_KEY_COLOR = (97, 175, 239)
+SHIFT_SYMBOL_COLOR = (180, 180, 180) 
 
 TEXT_BOX = pygame.Rect(20, 50, WIDTH - 40, 40)
 
 font_large = pygame.font.SysFont("Arial", 36, bold=True)
 font_medium = pygame.font.SysFont("Arial", 24)
 font_small = pygame.font.SysFont("Arial", 18)
+font_tiny = pygame.font.SysFont("Arial", 12)  
+
 
 keyboard_layout = [
-    [{"key": "esc", "label": "Esc", "rect": pygame.Rect(20, 100, 70, 40)},
-     {"key": "f1", "label": "F1", "rect": pygame.Rect(100, 100, 70, 40)},
-     {"key": "f2", "label": "F2", "rect": pygame.Rect(180, 100, 70, 40)},
-     {"key": "f3", "label": "F3", "rect": pygame.Rect(260, 100, 70, 40)},
-     {"key": "f4", "label": "F4", "rect": pygame.Rect(340, 100, 70, 40)},
-     {"key": "f5", "label": "F5", "rect": pygame.Rect(420, 100, 70, 40)},
-     {"key": "f6", "label": "F6", "rect": pygame.Rect(500, 100, 70, 40)},
-     {"key": "f7", "label": "F7", "rect": pygame.Rect(580, 100, 70, 40)},
-     {"key": "f8", "label": "F8", "rect": pygame.Rect(660, 100, 70, 40)},
-     {"key": "f9", "label": "F9", "rect": pygame.Rect(740, 100, 70, 40)},
-     {"key": "f10", "label": "F10", "rect": pygame.Rect(820, 100, 70, 40)},
-     {"key": "f11", "label": "F11", "rect": pygame.Rect(900, 100, 70, 40)},
-     {"key": "f12", "label": "F12", "rect": pygame.Rect(980, 100, 70, 40)},
-     {"key": "pause", "label": "Pause", "rect": pygame.Rect(1140, 100, 70, 40)},
-     {"key": "prtscr", "label": "PrtScr", "rect": pygame.Rect(1060, 100, 70, 40)},
-     {"key": "insert", "label": "Insert", "rect": pygame.Rect(1220, 100, 70, 40)},
-     {"key": "delete", "label": "Delete", "rect": pygame.Rect(1300, 100, 70, 40)}],
 
-    [{"key": "`", "label": "`", "rect": pygame.Rect(20, 150, 50, 40)},
-     {"key": "1", "label": "1", "rect": pygame.Rect(80, 150, 50, 40)},
-     {"key": "2", "label": "2", "rect": pygame.Rect(140, 150, 50, 40)},
-     {"key": "3", "label": "3", "rect": pygame.Rect(200, 150, 50, 40)},
-     {"key": "4", "label": "4", "rect": pygame.Rect(260, 150, 50, 40)},
-     {"key": "5", "label": "5", "rect": pygame.Rect(320, 150, 50, 40)},
-     {"key": "6", "label": "6", "rect": pygame.Rect(380, 150, 50, 40)},
-     {"key": "7", "label": "7", "rect": pygame.Rect(440, 150, 50, 40)},
-     {"key": "8", "label": "8", "rect": pygame.Rect(500, 150, 50, 40)},
-     {"key": "9", "label": "9", "rect": pygame.Rect(560, 150, 50, 40)},
-     {"key": "0", "label": "0", "rect": pygame.Rect(620, 150, 50, 40)},
-     {"key": "-", "label": "-", "rect": pygame.Rect(680, 150, 50, 40)},
-     {"key": "=", "label": "=", "rect": pygame.Rect(740, 150, 50, 40)},
-     {"key": "backspace", "label": "Backspace", "rect": pygame.Rect(800, 150, 100, 40)},
-     {"key": "home", "label": "Home", "rect": pygame.Rect(960, 150, 50, 40)}],
+    [{"key": "esc", "label": "Esc", "symbol": "", "rect": pygame.Rect(20, 100, 70, 40)},
+     {"key": "f1", "label": "F1", "symbol": "", "rect": pygame.Rect(100, 100, 70, 40)},
+     {"key": "f2", "label": "F2", "symbol": "", "rect": pygame.Rect(180, 100, 70, 40)},
+     {"key": "f3", "label": "F3", "symbol": "", "rect": pygame.Rect(260, 100, 70, 40)},
+     {"key": "f4", "label": "F4", "symbol": "", "rect": pygame.Rect(340, 100, 70, 40)},
+     {"key": "f5", "label": "F5", "symbol": "", "rect": pygame.Rect(420, 100, 70, 40)},
+     {"key": "f6", "label": "F6", "symbol": "", "rect": pygame.Rect(500, 100, 70, 40)},
+     {"key": "f7", "label": "F7", "symbol": "", "rect": pygame.Rect(580, 100, 70, 40)},
+     {"key": "f8", "label": "F8", "symbol": "", "rect": pygame.Rect(660, 100, 70, 40)},
+     {"key": "f9", "label": "F9", "symbol": "", "rect": pygame.Rect(740, 100, 70, 40)},
+     {"key": "f10", "label": "F10", "symbol": "", "rect": pygame.Rect(820, 100, 70, 40)},
+     {"key": "f11", "label": "F11", "symbol": "", "rect": pygame.Rect(900, 100, 70, 40)},
+     {"key": "f12", "label": "F12", "symbol": "", "rect": pygame.Rect(980, 100, 70, 40)},
+     {"key": "prtscr", "label": "PrtScr", "symbol": "", "rect": pygame.Rect(1060, 100, 70, 40)},
+     {"key": "pause", "label": "Pause", "symbol": "", "rect": pygame.Rect(1140, 100, 70, 40)},
+     {"key": "insert", "label": "Insert", "symbol": "", "rect": pygame.Rect(1220, 100, 70, 40)},
+     {"key": "delete", "label": "Delete", "symbol": "", "rect": pygame.Rect(1300, 100, 70, 40)}],
+    
+   
+    [{"key": "卢", "label": "卢", "symbol": "", "rect": pygame.Rect(20, 150, 50, 30)},
+     {"key": "!", "label": "!", "symbol": "", "rect": pygame.Rect(80, 150, 50, 30)},
+     {"key": '"', "label": '"', "symbol": "", "rect": pygame.Rect(140, 150, 50, 30)},
+     {"key": "拢", "label": "拢", "symbol": "", "rect": pygame.Rect(200, 150, 50, 30)},
+     {"key": "$", "label": "$", "symbol": "", "rect": pygame.Rect(260, 150, 50, 30)},
+     {"key": "%", "label": "%", "symbol": "", "rect": pygame.Rect(320, 150, 50, 30)},
+     {"key": "^", "label": "^", "symbol": "", "rect": pygame.Rect(380, 150, 50, 30)},
+     {"key": "&", "label": "&", "symbol": "", "rect": pygame.Rect(440, 150, 50, 30)},
+     {"key": "*", "label": "*", "symbol": "", "rect": pygame.Rect(500, 150, 50, 30)},
+     {"key": "(", "label": "(", "symbol": "", "rect": pygame.Rect(560, 150, 50, 30)},
+     {"key": ")", "label": ")", "symbol": "", "rect": pygame.Rect(620, 150, 50, 30)},
+     {"key": "_", "label": "_", "symbol": "", "rect": pygame.Rect(680, 150, 50, 30)},
+     {"key": "+", "label": "+", "symbol": "", "rect": pygame.Rect(740, 150, 50, 30)},],
+    
 
-    [{"key": "tab", "label": "Tab", "rect": pygame.Rect(20, 200, 70, 40)},
-     {"key": "q", "label": "Q", "rect": pygame.Rect(100, 200, 50, 40)},
-     {"key": "w", "label": "W", "rect": pygame.Rect(160, 200, 50, 40)},
-     {"key": "e", "label": "E", "rect": pygame.Rect(220, 200, 50, 40)},
-     {"key": "r", "label": "R", "rect": pygame.Rect(280, 200, 50, 40)},
-     {"key": "t", "label": "T", "rect": pygame.Rect(340, 200, 50, 40)},
-     {"key": "y", "label": "Y", "rect": pygame.Rect(400, 200, 50, 40)},
-     {"key": "u", "label": "U", "rect": pygame.Rect(460, 200, 50, 40)},
-     {"key": "i", "label": "I", "rect": pygame.Rect(520, 200, 50, 40)},
-     {"key": "o", "label": "O", "rect": pygame.Rect(580, 200, 50, 40)},
-     {"key": "p", "label": "P", "rect": pygame.Rect(640, 200, 50, 40)},
-     {"key": "[", "label": "[", "rect": pygame.Rect(700, 200, 50, 40)},
-     {"key": "]", "label": "]", "rect": pygame.Rect(760, 200, 50, 40)},
-    # {"key": "\\", "label": "\\", "rect": pygame.Rect(820, 200, 70, 40)},
-     {"key": "pgup", "label": "PgUp", "rect": pygame.Rect(960, 200, 50, 40)}],
-
-    [{"key": "caps lock", "label": "Caps", "rect": pygame.Rect(20, 250, 90, 40)},
-     {"key": "a", "label": "A", "rect": pygame.Rect(120, 250, 50, 40)},
-     {"key": "s", "label": "S", "rect": pygame.Rect(180, 250, 50, 40)},
-     {"key": "d", "label": "D", "rect": pygame.Rect(240, 250, 50, 40)},
-     {"key": "f", "label": "F", "rect": pygame.Rect(300, 250, 50, 40)},
-     {"key": "g", "label": "G", "rect": pygame.Rect(360, 250, 50, 40)},
-     {"key": "h", "label": "H", "rect": pygame.Rect(420, 250, 50, 40)},
-     {"key": "j", "label": "J", "rect": pygame.Rect(480, 250, 50, 40)},
-     {"key": "k", "label": "K", "rect": pygame.Rect(540, 250, 50, 40)},
-     {"key": "l", "label": "L", "rect": pygame.Rect(600, 250, 50, 40)},
-     {"key": ";", "label": ";", "rect": pygame.Rect(660, 250, 50, 40)},
-     {"key": "'", "label": "'", "rect": pygame.Rect(720, 250, 50, 40)},
-     {"key": "#", "label": "#", "rect": pygame.Rect(780, 250, 50, 40)},
-     {"key": "enter", "label": "Enter", "rect": pygame.Rect(840, 250, 120, 40)},
-     {"key": "pgdn", "label": "PgDn", "rect": pygame.Rect(960, 250, 50, 40)}],
+    [{"key": "`", "label": "`", "symbol": "~", "rect": pygame.Rect(20, 190, 50, 40)},
+     {"key": "1", "label": "1", "symbol": "!", "rect": pygame.Rect(80, 190, 50, 40)},
+     {"key": "2", "label": "2", "symbol": "@", "rect": pygame.Rect(140, 190, 50, 40)},
+     {"key": "3", "label": "3", "symbol": "#", "rect": pygame.Rect(200, 190, 50, 40)},
+     {"key": "4", "label": "4", "symbol": "$", "rect": pygame.Rect(260, 190, 50, 40)},
+     {"key": "5", "label": "5", "symbol": "%", "rect": pygame.Rect(320, 190, 50, 40)},
+     {"key": "6", "label": "6", "symbol": "^", "rect": pygame.Rect(380, 190, 50, 40)},
+     {"key": "7", "label": "7", "symbol": "&", "rect": pygame.Rect(440, 190, 50, 40)},
+     {"key": "8", "label": "8", "symbol": "*", "rect": pygame.Rect(500, 190, 50, 40)},
+     {"key": "9", "label": "9", "symbol": "(", "rect": pygame.Rect(560, 190, 50, 40)},
+     {"key": "0", "label": "0", "symbol": ")", "rect": pygame.Rect(620, 190, 50, 40)},
+     {"key": "-", "label": "-", "symbol": "_", "rect": pygame.Rect(680, 190, 50, 40)},
+     {"key": "=", "label": "=", "symbol": "+", "rect": pygame.Rect(740, 190, 50, 40)},
+     {"key": "backspace", "label": "Backspace", "symbol": "", "rect": pygame.Rect(800, 190, 100, 40)},
+     {"key": "home", "label": "Home", "symbol": "", "rect": pygame.Rect(960, 190, 50, 40)}],
+     
 
 
-    [{"key": "lshift", "label": "Shift", "rect": pygame.Rect(20, 300, 100, 40)},
-     {"key": "\\", "label": "\\", "rect": pygame.Rect(140, 300, 50, 40)},
-     {"key": "z", "label": "Z", "rect": pygame.Rect(200, 300, 50, 40)},
-     {"key": "x", "label": "X", "rect": pygame.Rect(260, 300, 50, 40)},
-     {"key": "c", "label": "C", "rect": pygame.Rect(320, 300, 50, 40)},
-     {"key": "v", "label": "V", "rect": pygame.Rect(380, 300, 50, 40)},
-     {"key": "b", "label": "B", "rect": pygame.Rect(440, 300, 50, 40)},
-     {"key": "n", "label": "N", "rect": pygame.Rect(500, 300, 50, 40)},
-     {"key": "m", "label": "M", "rect": pygame.Rect(560, 300, 50, 40)},
-     {"key": ",", "label": ",", "rect": pygame.Rect(620, 300, 50, 40)},
-     {"key": ".", "label": ".", "rect": pygame.Rect(680, 300, 50, 40)},
-     {"key": "/", "label": "/", "rect": pygame.Rect(740, 300, 50, 40)},
-     {"key": "rshift", "label": "Shift", "rect": pygame.Rect(800, 300, 150, 40)},
-     {"key": "end", "label": "End", "rect": pygame.Rect(960, 300, 50, 40)}],
+    [{"key": "tab", "label": "Tab", "symbol": "", "rect": pygame.Rect(20, 240, 70, 40)},
+     {"key": "q", "label": "Q", "symbol": "", "rect": pygame.Rect(100, 240, 50, 40)},
+     {"key": "w", "label": "W", "symbol": "", "rect": pygame.Rect(160, 240, 50, 40)},
+     {"key": "e", "label": "E", "symbol": "", "rect": pygame.Rect(220, 240, 50, 40)},
+     {"key": "r", "label": "R", "symbol": "", "rect": pygame.Rect(280, 240, 50, 40)},
+     {"key": "t", "label": "T", "symbol": "", "rect": pygame.Rect(340, 240, 50, 40)},
+     {"key": "y", "label": "Y", "symbol": "", "rect": pygame.Rect(400, 240, 50, 40)},
+     {"key": "u", "label": "U", "symbol": "", "rect": pygame.Rect(460, 240, 50, 40)},
+     {"key": "i", "label": "I", "symbol": "", "rect": pygame.Rect(520, 240, 50, 40)},
+     {"key": "o", "label": "O", "symbol": "", "rect": pygame.Rect(580, 240, 50, 40)},
+     {"key": "p", "label": "P", "symbol": "", "rect": pygame.Rect(640, 240, 50, 40)},
+     {"key": "[", "label": "[", "symbol": "{", "rect": pygame.Rect(700, 240, 50, 40)},
+     {"key": "]", "label": "]", "symbol": "}", "rect": pygame.Rect(760, 240, 50, 40)},
+ #    {"key": "\\", "label": "\\", "symbol": "|", "rect": pygame.Rect(820, 240, 70, 40)},
+     {"key": "pgup", "label": "PgUp", "symbol": "", "rect": pygame.Rect(960, 240, 50, 40)}],
 
-    [{"key": "lctrl", "label": "Ctrl", "rect": pygame.Rect(20, 350, 70, 40)},
-     {"key": "Fn", "label": "Fn", "rect": pygame.Rect(100, 350, 70, 40)},
-     {"key": "win", "label": "Win", "rect": pygame.Rect(180, 350, 70, 40)},
-     {"key": "lalt", "label": "Alt", "rect": pygame.Rect(260, 350, 70, 40)},
-     {"key": "space", "label": "Space", "rect": pygame.Rect(340, 350, 300, 40)},
-     {"key": "ralt", "label": "Alt", "rect": pygame.Rect(650, 350, 70, 40)},
-     {"key": "rctrl", "label": "Ctrl", "rect": pygame.Rect(730, 350, 70, 40)},
-     {"key": "left", "label": "left", "rect": pygame.Rect(820, 350, 50, 40)},
-     {"key": "up", "label": "up", "rect": pygame.Rect(880, 350, 50, 40)},
-     {"key": "down", "label": "down", "rect": pygame.Rect(880, 400, 50, 40)}],
 
-    [{"key": "right", "label": "right", "rect": pygame.Rect(940, 350, 50, 40)}]
+    [{"key": "caps lock", "label": "Caps", "symbol": "", "rect": pygame.Rect(20, 290, 90, 40)},
+     {"key": "a", "label": "A", "symbol": "", "rect": pygame.Rect(120, 290, 50, 40)},
+     {"key": "s", "label": "S", "symbol": "", "rect": pygame.Rect(180, 290, 50, 40)},
+     {"key": "d", "label": "D", "symbol": "", "rect": pygame.Rect(240, 290, 50, 40)},
+     {"key": "f", "label": "F", "symbol": "", "rect": pygame.Rect(300, 290, 50, 40)},
+     {"key": "g", "label": "G", "symbol": "", "rect": pygame.Rect(360, 290, 50, 40)},
+     {"key": "h", "label": "H", "symbol": "", "rect": pygame.Rect(420, 290, 50, 40)},
+     {"key": "j", "label": "J", "symbol": "", "rect": pygame.Rect(480, 290, 50, 40)},
+     {"key": "k", "label": "K", "symbol": "", "rect": pygame.Rect(540, 290, 50, 40)},
+     {"key": "l", "label": "L", "symbol": "", "rect": pygame.Rect(600, 290, 50, 40)},
+     {"key": ";", "label": ";", "symbol": ":", "rect": pygame.Rect(660, 290, 50, 40)},
+     {"key": "'", "label": "'", "symbol": "@", "rect": pygame.Rect(720, 290, 50, 40)},
+     {"key": "#", "label": "#", "symbol": "~", "rect": pygame.Rect(780, 290, 50, 40)},
+     {"key": "enter", "label": "Enter", "symbol": "", "rect": pygame.Rect(840, 290, 120, 40)},
+     {"key": "pgdn", "label": "PgDn", "symbol": "", "rect": pygame.Rect(960, 290, 50, 40)}],
+     
+
+   
+    [{"key": "lshift", "label": "Shift", "symbol": "", "rect": pygame.Rect(20, 340, 100, 40)},
+     {"key": "\\", "label": "\\", "symbol": "|", "rect": pygame.Rect(140, 340, 50, 40)},
+     {"key": "z", "label": "Z", "symbol": "", "rect": pygame.Rect(200, 340, 50, 40)},
+     {"key": "x", "label": "X", "symbol": "", "rect": pygame.Rect(260, 340, 50, 40)},
+     {"key": "c", "label": "C", "symbol": "", "rect": pygame.Rect(320, 340, 50, 40)},
+     {"key": "v", "label": "V", "symbol": "", "rect": pygame.Rect(380, 340, 50, 40)},
+     {"key": "b", "label": "B", "symbol": "", "rect": pygame.Rect(440, 340, 50, 40)},
+     {"key": "n", "label": "N", "symbol": "", "rect": pygame.Rect(500, 340, 50, 40)},
+     {"key": "m", "label": "M", "symbol": "", "rect": pygame.Rect(560, 340, 50, 40)},
+     {"key": ",", "label": ",", "symbol": "<", "rect": pygame.Rect(620, 340, 50, 40)},
+     {"key": ".", "label": ".", "symbol": ">", "rect": pygame.Rect(680, 340, 50, 40)},
+     {"key": "/", "label": "/", "symbol": "?", "rect": pygame.Rect(740, 340, 50, 40)},
+     {"key": "rshift", "label": "Shift", "symbol": "", "rect": pygame.Rect(800, 340, 150, 40)},
+     {"key": "end", "label": "End", "symbol": "", "rect": pygame.Rect(960, 340, 50, 40)}],
+
+
+    [{"key": "lctrl", "label": "Ctrl", "symbol": "", "rect": pygame.Rect(20, 390, 70, 40)},
+     {"key": "Fn", "label": "Fn", "symbol": "", "rect": pygame.Rect(100, 390, 70, 40)},
+     {"key": "win", "label": "Win", "symbol": "", "rect": pygame.Rect(180, 390, 70, 40)},
+     {"key": "lalt", "label": "Alt", "symbol": "", "rect": pygame.Rect(260, 390, 70, 40)},
+     {"key": "space", "label": "Space", "symbol": "", "rect": pygame.Rect(340, 390, 300, 40)},
+     {"key": "ralt", "label": "Alt", "symbol": "", "rect": pygame.Rect(650, 390, 70, 40)},
+     {"key": "rctrl", "label": "Ctrl", "symbol": "", "rect": pygame.Rect(730, 390, 70, 40)},
+     {"key": "left", "label": "left", "symbol": "", "rect": pygame.Rect(820, 390, 50, 40)},
+     {"key": "up", "label": "up", "symbol": "", "rect": pygame.Rect(880, 390, 50, 40)},
+     {"key": "down", "label": "down", "symbol": "", "rect": pygame.Rect(880, 440, 50, 40)}],
+
+
+    [{"key": "right", "label": "right", "symbol": "", "rect": pygame.Rect(940, 390, 50, 40)}]
 ]
-
+          
 
 special_key_mapping = {
+
     pygame.K_ESCAPE: "esc",
     pygame.K_F1: "f1",
     pygame.K_F2: "f2",
@@ -193,6 +221,7 @@ special_key_mapping = {
     pygame.K_PAGEDOWN: "pgdn"
 }
 
+
 shift_special_mapping = {
     pygame.K_BACKQUOTE: "卢",
     pygame.K_0: ")",
@@ -218,16 +247,26 @@ shift_special_mapping = {
     pygame.K_QUOTE: "@"
 }
 
+
 def draw_key(key_data, is_pressed=False, caps_lock_on=False, is_highlighted=False):
     color = PRESSED_KEY_COLOR if is_pressed or is_highlighted else KEY_COLOR
     pygame.draw.rect(screen, color, key_data["rect"], border_radius=3)
     pygame.draw.rect(screen, (30, 30, 30), key_data["rect"], 1, border_radius=3)
     
+
     label = key_data["label"]
     if caps_lock_on and len(label) == 1 and label.isalpha():
         label = label.upper()
     else:
         label = label.lower() if len(label) == 1 and label.isalpha() else label
+
+
+    if key_data["symbol"]:
+        symbol = key_data["symbol"]
+        symbol_surf = font_tiny.render(symbol, True, SHIFT_SYMBOL_COLOR)
+        symbol_rect = symbol_surf.get_rect(topright=(key_data["rect"].right - 5, key_data["rect"].top + 5))
+        screen.blit(symbol_surf, symbol_rect)
+
 
     font = font_small if len(label) > 1 else font_medium
     text_surf = font.render(label, True, TEXT_COLOR)
@@ -257,6 +296,7 @@ def draw_keyboard(pressed_keys, highlighted_keys, pressed_history, caps_lock_on)
     screen.blit(footer, (WIDTH//2 - footer.get_width()//2, HEIGHT - 30))
 
     pygame.display.flip()
+    
     
 def keyboard_test_screen():
     pressed_keys = set()
@@ -402,7 +442,6 @@ def keyboard_test_screen():
     device.ungrab()  # Release the input device
     return                                                               
 
- 
 
 def main():
     clock = pygame.time.Clock()
@@ -427,5 +466,5 @@ def main():
         sys.exit(0)  # Ensure exit code 0
 
 if __name__ == "__main__":
-    main()    
-                
+    main()
+         
