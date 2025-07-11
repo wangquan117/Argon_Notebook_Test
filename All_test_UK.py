@@ -493,6 +493,50 @@ def run_all_tests(output_text, progress_bar, run_button):
     run_button.config(state=tk.NORMAL)
     return True
 
+def cleanup_and_exit(root):
+    files_to_remove = [
+        'recorded_media.mp4', 
+        'test_audio.wav',
+        'ffmpeg.log',
+        'ffplay.log',
+        '/home/pi/argon_notebook_test.sh',
+        '/home/pi/argon-scripts',
+        '/home/pi/Desktop/Argon_Test.desktop'
+    ]
+    
+    removed = []
+    not_found = []
+    failed = []
+    
+    for item in files_to_remove:
+        try:
+            if os.path.exists(item):
+                if os.path.isfile(item):
+                    os.remove(item)
+                    removed.append(item)
+                elif os.path.isdir(item):
+                    shutil.rmtree(item)
+                    removed.append(item + " (folder)")
+            else:
+                not_found.append(item)
+        except Exception as e:
+            failed.append(f"{item}: {str(e)}")
+    
+
+    message = "Clear results :\n"
+    if removed:
+        message += f"YES_Deleted files: {', '.join(removed)}\n"
+    if not_found:
+        message += f"File not found.: {', '.join(not_found)}\n"
+    if failed:
+        message += f"Deletion failed: {', '.join(failed)}\n"
+    
+    if not removed and not failed:
+        message += "no files that need to be cleaned up"
+    
+    messagebox.showinfo("Cleanup completed", message)
+    root.destroy()
+
 def create_gui():
     """Create the main GUI for the Argon One Test Toolkit"""
     root = tk.Tk()
@@ -611,6 +655,21 @@ def create_gui():
     
     # Check dependencies on startup
     deps_ok, missing = check_dependencies()
+    
+    cleanup_frame = ttk.Frame(root, padding="10")
+    cleanup_frame.pack(fill=tk.X)
+    
+    cleanup_button = ttk.Button(
+        cleanup_frame, 
+        text="clear_out", 
+        command=lambda: cleanup_and_exit(root),
+        style="Cleanup.TButton"
+    )
+    cleanup_button.pack(side=tk.RIGHT, padx=5)
+    
+   
+    style.configure("Cleanup.TButton", background="#ffcccc", foreground="#990000")
+    
     if not deps_ok:
         output_text.insert(tk.END, "Warning: Missing dependencies detected!\n", "warning")
         output_text.insert(tk.END, "Some tests may not work properly. Missing:\n", "warning")
