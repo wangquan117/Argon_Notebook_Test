@@ -541,7 +541,7 @@ def create_gui():
     """Create the main GUI for the Argon One Test Toolkit"""
     root = tk.Tk()
     root.title("Argon One Test Toolkit")
-    root.geometry("800x600")
+    root.geometry("1280x960")
     root.resizable(True, True)
     
     # Set application icon (if available)
