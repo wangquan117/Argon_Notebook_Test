@@ -49,8 +49,8 @@ keyboard_layout = [
      {"key": "f10", "label": "F10", "rect": pygame.Rect(820, 100, 70, 40)},
      {"key": "f11", "label": "F11", "rect": pygame.Rect(900, 100, 70, 40)},
      {"key": "f12", "label": "F12", "rect": pygame.Rect(980, 100, 70, 40)},
-     {"key": "pause", "label": "Pause", "rect": pygame.Rect(1060, 100, 70, 40)},
-     {"key": "prtscr", "label": "PrtScr", "rect": pygame.Rect(1140, 100, 70, 40)},
+     {"key": "prtscr", "label": "prtscr", "rect": pygame.Rect(1060, 100, 70, 40)},
+     {"key": "pause", "label": "Pause", "rect": pygame.Rect(1140, 100, 70, 40)},
      {"key": "insert", "label": "Insert", "rect": pygame.Rect(1220, 100, 70, 40)},
      {"key": "delete", "label": "Delete", "rect": pygame.Rect(1300, 100, 70, 40)}],
 
