@@ -494,14 +494,17 @@ def run_all_tests(output_text, progress_bar, run_button):
     return True
 
 def cleanup_and_exit(root):
+  
+    home_dir = os.path.expanduser("~")
+    
     files_to_remove = [
         'recorded_media.mp4', 
         'test_audio.wav',
         'ffmpeg.log',
         'ffplay.log',
-        '/home/pi/argon_notebook_test.sh',
-        '/home/pi/argon-scripts',
-        '/home/pi/Desktop/Argon_Test.desktop'
+        os.path.join(home_dir, 'argon_notebook_test.sh'),
+        os.path.join(home_dir, 'argon-scripts'),
+        os.path.join(home_dir, 'Desktop', 'Argon_Test.desktop')
     ]
     
     removed = []
@@ -522,7 +525,6 @@ def cleanup_and_exit(root):
         except Exception as e:
             failed.append(f"{item}: {str(e)}")
     
-
     message = "Clear results :\n"
     if removed:
         message += f"YES_Deleted files: {', '.join(removed)}\n"
@@ -536,7 +538,7 @@ def cleanup_and_exit(root):
     
     messagebox.showinfo("Cleanup completed", message)
     root.destroy()
-
+    
 def create_gui():
     """Create the main GUI for the Argon One Test Toolkit"""
     root = tk.Tk()
