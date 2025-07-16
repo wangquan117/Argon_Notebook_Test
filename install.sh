@@ -51,6 +51,24 @@ rm /tmp/argon-scripts.zip
 echo "Executing additional setup script..."
 curl http://files.iamnet.com.ph/argon/setup/argononeup.sh | bash
 
+
+# Create the desktop entry
+echo "Creating desktop entry..."
+cat <<EOF > "$DESKTOP_FILE"
+[Desktop Entry]
+Name=Argon  Test Toolkit One
+Comment=Test Toolkit for Argon One Raspberry Pi Case
+Exec=python3 /home/pi/argon-scripts/Argon_Notebook_Test-main/All_test_US.py
+Icon=/home/pi/argon-scripts/Argon_Notebook_Test-main/2.png
+Terminal=false
+Type=Application
+Categories=Utility;
+EOF
+
+# Make the desktop file executable
+chmod +x "$DESKTOP_FILE"
+
+
 echo "========================================"
 echo "Installation successful!"
 echo "Scripts have been saved to: $INSTALL_DIR/Argon_Notebook_Test-$BRANCH"
