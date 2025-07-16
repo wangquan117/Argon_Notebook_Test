@@ -494,16 +494,19 @@ def run_all_tests(output_text, progress_bar, run_button):
     return True
 
 def cleanup_and_exit(root):
+      
+    home_dir = os.path.expanduser("~")
+    
     files_to_remove = [
         'recorded_media.mp4', 
         'test_audio.wav',
         'ffmpeg.log',
         'ffplay.log',
-        '/home/pi/argon_notebook_test.sh',
-        '/home/pi/argon-scripts',
-        '/home/pi/Desktop/Argon_Test.desktop'
+        os.path.join(home_dir, 'argon_notebook_test.sh'),
+        os.path.join(home_dir, 'argon-scripts'),
+        os.path.join(home_dir, 'Desktop', 'Argon_Test.desktop')
     ]
-    
+  
     removed = []
     not_found = []
     failed = []
@@ -555,12 +558,18 @@ def create_gui():
     # Create style
     style = ttk.Style()
     style.configure("TButton", padding=6, font=('Helvetica', 10))
+    style.configure("Big.TButton", font=('Helvetica', 12, 'bold'), padding=10)
     style.configure("Title.TLabel", font=('Helvetica', 16, 'bold'))
     style.configure("Info.TLabel", font=('Helvetica', 10))
+    style.configure("Cleanup.TButton", background="#ffcccc", foreground="#990000")
     
-    # Create header frame
-    header_frame = ttk.Frame(root, padding="10")
-    header_frame.pack(fill=tk.X)
+    # Main container frame
+    main_frame = ttk.Frame(root)
+    main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+    
+    # Header frame
+    header_frame = ttk.Frame(main_frame)
+    header_frame.pack(fill=tk.X, pady=(0, 10))
     
     # Title
     title_label = ttk.Label(header_frame, text="Argon One Test Toolkit", style="Title.TLabel")
@@ -571,105 +580,86 @@ def create_gui():
     version_label.pack(side=tk.RIGHT)
     
     # Create button frame
-    button_frame = ttk.Frame(root, padding="10")
-    button_frame.pack(fill=tk.X)
+    button_container = ttk.Frame(main_frame)
+    button_container.pack(fill=tk.X, pady=(0, 10))
     
-    # Create output text area
-    output_frame = ttk.Frame(root, padding="10")
+    # Run All Tests button (full width)
+    run_all_frame = ttk.Frame(button_container)
+    run_all_frame.pack(fill=tk.X, pady=(0, 10))
+    
+    run_all_button = ttk.Button(
+        run_all_frame, 
+        text="Run All Tests", 
+        style="Big.TButton",
+        command=lambda: threading.Thread(
+            target=run_all_tests, 
+            args=(output_text, progress_bar, run_all_button), 
+            daemon=True).start()
+    )
+    run_all_button.pack(fill=tk.X, expand=True)
+    
+    # Other test buttons in a grid
+    test_buttons_frame = ttk.Frame(button_container)
+    test_buttons_frame.pack(fill=tk.X)
+    
+    test_buttons = [
+        ("Keyboard Test", lambda: threading.Thread(target=run_key_board, args=(output_text,), daemon=True).start()),
+        ("Screen RGB Test", lambda: threading.Thread(target=run_screen_rgb, args=(output_text,), daemon=True).start()),
+        ("Camera Test", lambda: threading.Thread(target=run_camera, args=(threading.Event(), output_text), daemon=True).start()),
+        ("Audio Test", lambda: threading.Thread(target=run_recording_playback, args=(threading.Event(), output_text), daemon=True).start()),
+        ("Power Test", lambda: threading.Thread(target=run_electricity_power, args=(output_text,), daemon=True).start()),
+        ("Flow Light Test", lambda: threading.Thread(target=run_flow_light, args=(output_text,), daemon=True).start()),
+    ]
+    
+# Create buttons in a 3-column grid
+    for i, (text, command) in enumerate(test_buttons):
+        row = i // 3
+        col = i % 3
+        btn = ttk.Button(test_buttons_frame, text=text, command=command)
+        btn.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+        test_buttons_frame.columnconfigure(col, weight=1)
+    
+    # Progress bar
+    progress_frame = ttk.Frame(main_frame)
+    progress_frame.pack(fill=tk.X, pady=(0, 10))
+    
+    progress_bar = ttk.Progressbar(progress_frame, orient=tk.HORIZONTAL, mode='determinate')
+    progress_bar.pack(fill=tk.X)
+    
+    # Output text area
+    output_frame = ttk.Frame(main_frame)
     output_frame.pack(fill=tk.BOTH, expand=True)
     
     output_text = scrolledtext.ScrolledText(output_frame, wrap=tk.WORD, font=('Courier', 10))
     output_text.pack(fill=tk.BOTH, expand=True)
     
-    # Configure text tags for styling
+    # Configure text tags
     output_text.tag_configure("info", foreground="blue")
     output_text.tag_configure("success", foreground="green")
     output_text.tag_configure("warning", foreground="orange")
     output_text.tag_configure("error", foreground="red")
     output_text.tag_configure("bold", font=('Courier', 10, 'bold'))
     
-    # Create progress bar
-    progress_frame = ttk.Frame(root, padding="10")
-    progress_frame.pack(fill=tk.X)
-    
-    progress_bar = ttk.Progressbar(progress_frame, orient=tk.HORIZONTAL, mode='determinate')
-    progress_bar.pack(fill=tk.X)
-    
-    # Create test buttons
-    buttons = [
-        ("Run All Tests", lambda: threading.Thread(
-            target=run_all_tests, 
-            args=(output_text, progress_bar, run_all_button), 
-            daemon=True).start()),
-        ("Keyboard Test", lambda: threading.Thread(
-            target=run_key_board, 
-            args=(output_text,), 
-            daemon=True).start()),
-        ("Screen RGB Test", lambda: threading.Thread(
-            target=run_screen_rgb, 
-            args=(output_text,), 
-            daemon=True).start()),
-        ("Camera Test", lambda: threading.Thread(
-            target=run_camera, 
-            args=(threading.Event(), output_text), 
-            daemon=True).start()),
-        ("Audio Test", lambda: threading.Thread(
-            target=run_recording_playback, 
-            args=(threading.Event(), output_text), 
-            daemon=True).start()),
-        ("Power Test", lambda: threading.Thread(
-            target=run_electricity_power, 
-            args=(output_text,), 
-            daemon=True).start()),
-        ("Flow Light Test", lambda: threading.Thread(
-            target=run_flow_light, 
-            args=(output_text,), 
-            daemon=True).start()),
-    ]
-    
-    # Add buttons to the frame in a grid
-    for i, (text, command) in enumerate(buttons):
-        row = i // 3
-        col = i % 3
-        btn = ttk.Button(button_frame, text=text, command=command)
-        btn.grid(row=row, column=col, padx=5, pady=5, sticky="ew")
-        
-        # Store reference to the "Run All Tests" button
-        if text == "Run All Tests":
-            run_all_button = btn
-    
-    # Make buttons expand equally
-    for i in range(3):
-        button_frame.columnconfigure(i, weight=1)
-    
-    # Add exit button
-    exit_frame = ttk.Frame(root, padding="10")
-    exit_frame.pack(fill=tk.X)
-    
-    exit_button = ttk.Button(exit_frame, text="Exit", command=root.destroy)
-    exit_button.pack(side=tk.RIGHT)
-    
-    # Add initial message
-    output_text.insert(tk.END, "Argon One Test Toolkit v1.0\n", "bold")
-    output_text.insert(tk.END, "Ready to run tests. Select a test from the buttons above.\n\n")
-    
-    # Check dependencies on startup
-    deps_ok, missing = check_dependencies()
-    
-    cleanup_frame = ttk.Frame(root, padding="10")
-    cleanup_frame.pack(fill=tk.X)
+    # Bottom buttons frame
+    bottom_frame = ttk.Frame(main_frame)
+    bottom_frame.pack(fill=tk.X, pady=(10, 0))
     
     cleanup_button = ttk.Button(
-        cleanup_frame, 
-        text="clear_out", 
+        bottom_frame, 
+        text="Clear Output", 
         command=lambda: cleanup_and_exit(root),
         style="Cleanup.TButton"
     )
     cleanup_button.pack(side=tk.RIGHT, padx=5)
     
-   
-    style.configure("Cleanup.TButton", background="#ffcccc", foreground="#990000")
+    exit_button = ttk.Button(bottom_frame, text="Exit", command=root.destroy)
+    exit_button.pack(side=tk.RIGHT)
     
+    # Initial message
+    output_text.insert(tk.END, "Argon One Test Toolkit v1.0\n", "bold")
+    output_text.insert(tk.END, "Ready to run tests. Select a test from the buttons above.\n\n")
+    # Check dependencies
+    deps_ok, missing = check_dependencies()
     if not deps_ok:
         output_text.insert(tk.END, "Warning: Missing dependencies detected!\n", "warning")
         output_text.insert(tk.END, "Some tests may not work properly. Missing:\n", "warning")
