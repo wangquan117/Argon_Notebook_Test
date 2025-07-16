@@ -13,7 +13,9 @@ WIDTH, HEIGHT = 1680, 960
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Argon ONE UP Keyboard Tester")
 
-device = InputDevice('/dev/input/event9')
+
+device_main = InputDevice('/dev/input/event9')  
+device_fn = InputDevice('/dev/input/event13')   
 
 BACKGROUND = (40, 44, 52)
 PANEL_BG = (30, 34, 42)
@@ -67,6 +69,7 @@ keyboard_layout = [
      {"key": "=", "label": "=", "rect": pygame.Rect(740, 150, 50, 40)},
      {"key": "backspace", "label": "Backspace", "rect": pygame.Rect(800, 150, 100, 40)},
      {"key": "home", "label": "Home", "rect": pygame.Rect(960, 150, 50, 40)}],
+     
 
     [{"key": "tab", "label": "Tab", "rect": pygame.Rect(20, 200, 70, 40)},
      {"key": "q", "label": "Q", "rect": pygame.Rect(100, 200, 50, 40)},
@@ -97,13 +100,11 @@ keyboard_layout = [
      {"key": "l", "label": "L", "rect": pygame.Rect(600, 250, 50, 40)},
      {"key": ";", "label": ";", "rect": pygame.Rect(660, 250, 50, 40)},
      {"key": "'", "label": "'", "rect": pygame.Rect(720, 250, 50, 40)},
- #    {"key": "#", "label": "#", "rect": pygame.Rect(780, 250, 50, 40)},
      {"key": "enter", "label": "Enter", "rect": pygame.Rect(840, 250, 120, 40)},
      {"key": "pgdn", "label": "PgDn", "rect": pygame.Rect(960, 250, 50, 40)}],
 
 
     [{"key": "lshift", "label": "Shift", "rect": pygame.Rect(20, 300, 100, 40)},
-#     {"key": "\\", "label": "\\", "rect": pygame.Rect(140, 300, 50, 40)},
      {"key": "z", "label": "Z", "rect": pygame.Rect(200, 300, 50, 40)},
      {"key": "x", "label": "X", "rect": pygame.Rect(260, 300, 50, 40)},
      {"key": "c", "label": "C", "rect": pygame.Rect(320, 300, 50, 40)},
@@ -123,12 +124,14 @@ keyboard_layout = [
      {"key": "lalt", "label": "Alt", "rect": pygame.Rect(260, 350, 70, 40)},
      {"key": "space", "label": "Space", "rect": pygame.Rect(340, 350, 300, 40)},
      {"key": "ralt", "label": "Alt", "rect": pygame.Rect(650, 350, 70, 40)},
-     {"key": "rctrl", "label": "Ctrl", "rect": pygame.Rect(730, 350, 70, 40)},
-     {"key": "left", "label": "left", "rect": pygame.Rect(820, 350, 50, 40)},
-     {"key": "up", "label": "up", "rect": pygame.Rect(880, 350, 50, 40)},
-     {"key": "down", "label": "down", "rect": pygame.Rect(880, 400, 50, 40)}],
+    
+     {"key": "compose", "label": "Compose", "rect": pygame.Rect(730, 350, 70, 40)},
+     {"key": "rctrl", "label": "Ctrl", "rect": pygame.Rect(810, 350, 70, 40)},
+     {"key": "left", "label": "left", "rect": pygame.Rect(890, 350, 50, 40)},
+     {"key": "up", "label": "up", "rect": pygame.Rect(950, 350, 50, 40)},
+     {"key": "down", "label": "down", "rect": pygame.Rect(950, 400, 50, 40)}],
 
-    [{"key": "right", "label": "right", "rect": pygame.Rect(940, 350, 50, 40)}]
+    [{"key": "right", "label": "right", "rect": pygame.Rect(1010, 350, 50, 40)}]
 ]
 
 
@@ -165,7 +168,7 @@ special_key_mapping = {
     pygame.K_SPACE: "space",
     pygame.K_LEFTBRACKET: "[",
     pygame.K_RIGHTBRACKET: "]",
-    92: "\\",
+    92: "\\",  # Backslash
     35: "#",
     pygame.K_SEMICOLON: ";",
     pygame.K_QUOTE: "'",
@@ -191,8 +194,12 @@ special_key_mapping = {
     pygame.K_HOME: "home",
     pygame.K_END: "end",
     pygame.K_PAGEUP: "pgup",
-    pygame.K_PAGEDOWN: "pgdn"
+    pygame.K_PAGEDOWN: "pgdn",
+ 
+    #pygame.K_COMPOSE: "compose"
+#    127: "compose"
 }
+
 
 shift_special_mapping = {
     pygame.K_BACKQUOTE: "~",
@@ -218,6 +225,12 @@ shift_special_mapping = {
     35: "~",
     pygame.K_QUOTE: '"'
 }
+
+fn_key_mapping = {
+    'KEY_BRIGHTNESSUP': 'f3',
+    'KEY_BRIGHTNESSDOWN': 'f2',
+}
+
 
 def draw_key(key_data, is_pressed=False, caps_lock_on=False, is_highlighted=False):
     color = PRESSED_KEY_COLOR if is_pressed or is_highlighted else KEY_COLOR
@@ -259,6 +272,7 @@ def draw_keyboard(pressed_keys, highlighted_keys, pressed_history, caps_lock_on)
 
     pygame.display.flip()
     
+    
 def keyboard_test_screen():
     pressed_keys = set()
     highlighted_keys = set()  # Track keys that stay highlighted
@@ -269,17 +283,37 @@ def keyboard_test_screen():
     caps_lock_on = False
     ctrl_pressed = False
     alt_pressed = False
+    fn_pressed = False  
 
-    required_keys = set()
+  
+    all_keys = set()
     for row in keyboard_layout:
         for key in row:
-            if key["key"] not in ["Fn", "win"]:  
-                required_keys.add(key["key"])
+            all_keys.add(key["key"])
 
 
+    all_keys.add("compose")
 
     while running:
-        # Handle Pygame events
+
+        if highlighted_keys.issuperset(all_keys):
+   
+            for row in keyboard_layout:
+                for key in row:
+                    pygame.draw.rect(screen, GOOD_COLOR, key["rect"], border_radius=3)
+                    pygame.draw.rect(screen, (30, 30, 30), key["rect"], 1, border_radius=3)
+                    text_surf = font_medium.render(key["label"], True, (0, 0, 0))
+                    text_rect = text_surf.get_rect(center=key["rect"].center)
+                    screen.blit(text_surf, text_rect)
+           
+            message = font_large.render("ALL KEYS TESTED! EXITING...", True, GOOD_COLOR)
+            screen.blit(message, (WIDTH//2 - message.get_width()//2, HEIGHT//2))
+            pygame.display.flip()
+        
+            pygame.time.delay(2000)
+            running = False
+            break
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -288,15 +322,17 @@ def keyboard_test_screen():
                     shift_pressed = True
                     key_name = "lshift" if event.key == pygame.K_LSHIFT else "rshift"
                     pressed_keys.add(key_name)
+                    highlighted_keys.add(key_name)
                 elif event.key in [pygame.K_LCTRL, pygame.K_RCTRL]:
                     ctrl_pressed = True
                     key_name = "lctrl" if event.key == pygame.K_LCTRL else "rctrl"
                     pressed_keys.add(key_name)
+                    highlighted_keys.add(key_name)
                 elif event.key in [pygame.K_LALT, pygame.K_RALT]:
                     alt_pressed = True
                     key_name = "lalt" if event.key == pygame.K_LALT else "ralt"
                     pressed_keys.add(key_name)
-                print(f"Pygame Key pressed: {event.key}, Name: {pygame.key.name(event.key)}")
+                    highlighted_keys.add(key_name)
                 if event.key == pygame.K_c and pygame.key.get_mods() & pygame.KMOD_CTRL:
                     running = False
                 elif event.key == pygame.K_q and pygame.key.get_mods() & pygame.KMOD_CTRL and pygame.key.get_mods() & pygame.KMOD_ALT:
@@ -328,6 +364,7 @@ def keyboard_test_screen():
                     pressed_keys.add(key_name)
                     highlighted_keys.add(key_name)
                     pressed_history.append(display_key_name)
+
                     
                     if event.key in [pygame.K_LSHIFT, pygame.K_RSHIFT]:
                         shift_pressed = True
@@ -346,6 +383,7 @@ def keyboard_test_screen():
                 mods = pygame.key.get_mods()
                 shift_pressed = bool(mods & pygame.KMOD_SHIFT)
                 
+                
                 if shift_pressed and event.key in shift_special_mapping:
                     key_name = shift_special_mapping[event.key]
                 elif event.key in special_key_mapping:
@@ -358,51 +396,77 @@ def keyboard_test_screen():
                 if key_name in pressed_keys:
                     pressed_keys.remove(key_name)
 
-        # Handle evdev events (only for prtscr)
+        # (event9)
         try:
-            for ev in device.read():
+            for ev in device_main.read():
                 if ev.type == ecodes.EV_KEY:
                     key_event = categorize(ev)
-                    if key_event.keystate == 1:  # Key down
-                        if key_event.keycode == 'KEY_SYSRQ':
-                            print("evdev: Print Screen pressed!")
+        
+                    if key_event.keycode == 'KEY_LEFTMETA' or key_event.keycode == 'KEY_RIGHTMETA':
+                        if key_event.keystate == 1:  
+                            pressed_keys.add("win")
+                            highlighted_keys.add("win")
+                            pressed_history.append("Win")
+                        elif key_event.keystate == 0:  
+                            if "win" in pressed_keys:
+                                pressed_keys.remove("win")
+      
+                    elif key_event.keycode == 'KEY_COMPOSE':
+                        if key_event.keystate == 1: 
+                            pressed_keys.add("compose")
+                            highlighted_keys.add("compose")
+                            pressed_history.append("Compose")
+                        elif key_event.keystate == 0:  
+                            if "compose" in pressed_keys:
+                                pressed_keys.remove("compose")
+                                
+                    elif key_event.keycode == 'KEY_SYSRQ':
+                        if key_event.keystate == 1:
                             pressed_keys.add("prtscr")
                             highlighted_keys.add("prtscr")
                             pressed_history.append("PrtScr")
-                    elif key_event.keystate == 0:  # Key up
-                        if key_event.keycode == 'KEY_SYSRQ' and "prtscr" in pressed_keys:
-                            pressed_keys.remove("prtscr")
+                        elif key_event.keystate == 0:
+                            if "prtscr" in pressed_keys:
+                                pressed_keys.remove("prtscr")
+                               
         except BlockingIOError:
-            pass  # Ignore when no events are available
+            pass  
 
 
-        if required_keys.issubset(highlighted_keys):
+        try:
+            for ev in device_fn.read():
+                if ev.type == ecodes.EV_KEY:
+                    key_event = categorize(ev)
             
-            for row in keyboard_layout:
-                for key in row:
-                    if key["key"] in required_keys:
-                        
-                        pygame.draw.rect(screen, GOOD_COLOR, key["rect"], border_radius=3)
-                        pygame.draw.rect(screen, (30, 30, 30), key["rect"], 1, border_radius=3)
-                        text_surf = font_medium.render(key["label"], True, (0, 0, 0))
-                        text_rect = text_surf.get_rect(center=key["rect"].center)
-                        screen.blit(text_surf, text_rect)
-            
-            
-            message = font_large.render("ALL KEYS TESTED! EXITING...", True, GOOD_COLOR)
-            screen.blit(message, (WIDTH//2 - message.get_width()//2, HEIGHT//2))
-            pygame.display.flip()
-            pygame.time.delay(2000)  
-            running = False
-            break
+                    if key_event.keycode == 'KEY_FN':
+                        if key_event.keystate == 1:  
+                            fn_pressed = True
+                            pressed_keys.add("Fn")
+                            highlighted_keys.add("Fn")
+                        elif key_event.keystate == 0:  
+                            fn_pressed = False
+                            if "Fn" in pressed_keys:
+                                pressed_keys.remove("Fn")
+                    elif key_event.keycode in fn_key_mapping:
+                        mapped_key = fn_key_mapping[key_event.keycode]
+                        if key_event.keystate == 1:  
+                            pressed_keys.add(mapped_key)
+                            highlighted_keys.add(mapped_key)
+                            highlighted_keys.add("Fn")  
+                            pressed_history.append(f"Fn+{mapped_key.upper()}")
+                        elif key_event.keystate == 0:  
+                            if mapped_key in pressed_keys:
+                                pressed_keys.remove(mapped_key)
+        except BlockingIOError:
+            pass
 
         draw_keyboard(pressed_keys, highlighted_keys, pressed_history, caps_lock_on)
         clock.tick(30)
 
-    device.ungrab()  # Release the input device
-    return                                                               
-
  
+    device_main.ungrab()
+    device_fn.ungrab()
+    return                                                                             
 
 def main():
     clock = pygame.time.Clock()
@@ -418,14 +482,15 @@ def main():
     except KeyboardInterrupt:
         print("Keyboard test interrupted by Ctrl+C, exiting gracefully...", flush=True)
     finally:
-#        pygame.quit()
         try:
-            device.ungrab()
+            device_main.ungrab()
+            device_fn.ungrab()
         except OSError as e:
             print(f"Warning: Failed to ungrab device: {e}", flush=True)
         print("Keyboard test completed successfully!", flush=True)
-        sys.exit(0)  # Ensure exit code 0
+        sys.exit(0) 
 
 if __name__ == "__main__":
-    main()    
-                
+    main()                    
+
+     
