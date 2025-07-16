@@ -502,9 +502,9 @@ def cleanup_and_exit(root):
         'test_audio.wav',
         'ffmpeg.log',
         'ffplay.log',
-        os.path.join(home_dir, 'argon_notebook_test.sh'),
+        os.path.join(home_dir, 'install.sh'),
         os.path.join(home_dir, 'argon-scripts'),
-        os.path.join(home_dir, 'Desktop', 'Argon_Test.desktop')
+        os.path.join(home_dir, 'Desktop', 'Argon_Test_Toolkit_One.desktop')
     ]
     
     removed = []
