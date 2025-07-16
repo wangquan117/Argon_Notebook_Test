@@ -44,7 +44,7 @@ while running:
     screen.fill(colors[color_index])
     pygame.display.flip()
 
-    time.sleep(1)  
+    time.sleep(2)  
 
     color_index = (color_index + 1) % len(colors)
 
