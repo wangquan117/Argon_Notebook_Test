@@ -22,6 +22,7 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 
 # Check and install necessary tools
+echo "Checking system dependencies..."
 if ! command -v unzip &> /dev/null; then
     echo "Installing unzip..."
     sudo apt update && sudo apt install unzip -y || {
@@ -37,6 +38,21 @@ if ! command -v wget &> /dev/null; then
         exit 1
     }
 fi
+
+if ! command -v pip3 &> /dev/null; then
+    echo "Installing python3-pip..."
+    sudo apt install python3-pip -y || {
+        echo "Failed to install python3-pip. Please install it manually." >&2
+        exit 1
+    }
+fi
+
+# Upgrade Pillow with system package compatibility
+echo "Upgrading Pillow library..."
+pip3 install --upgrade Pillow --break-system-packages || {
+    echo "Warning: Failed to upgrade Pillow library. Some features may not work properly." >&2
+    echo "You may try running manually with: pip3 install --upgrade Pillow --break-system-packages" >&2
+}
 
 # Create installation directory
 echo "Creating installation directory: $INSTALL_DIR"
@@ -121,6 +137,8 @@ echo "Instructions for use:"
 echo "1. Command line: Just type 'argon' to run the toolkit"
 echo "2. GUI: Find 'Argon Test Toolkit One' in your application menu"
 echo "3. Manual execution: cd $INSTALL_DIR/Argon_Notebook_Test-$BRANCH && ./argon.sh"
+echo ""
+echo "Note: Pillow library has been upgraded for better compatibility."
 echo "========================================"
 
 exit 0
