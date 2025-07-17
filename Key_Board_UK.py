@@ -221,11 +221,11 @@ special_key_mapping = {
 
 
 shift_special_mapping = {
-    pygame.K_BACKQUOTE: "~",
+    pygame.K_BACKQUOTE: "¬",
     pygame.K_0: ")",
     pygame.K_1: "!",
-    pygame.K_2: '@',
-    pygame.K_3: "#",
+    pygame.K_2: '"',
+    pygame.K_3: "£",
     pygame.K_4: "$",
     pygame.K_5: "%",
     pygame.K_6: "^",
