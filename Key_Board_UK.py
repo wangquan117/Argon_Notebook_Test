@@ -56,10 +56,10 @@ keyboard_layout = [
      {"key": "delete", "label": "Delete", "symbol": "", "rect": pygame.Rect(1300, 100, 70, 40)}],
     
    
-    [{"key": "卢", "label": "卢", "symbol": "", "rect": pygame.Rect(20, 150, 50, 30)},
+    [{"key": "¬", "label": "¬", "symbol": "", "rect": pygame.Rect(20, 150, 50, 30)},
      {"key": "!", "label": "!", "symbol": "", "rect": pygame.Rect(80, 150, 50, 30)},
      {"key": '"', "label": '"', "symbol": "", "rect": pygame.Rect(140, 150, 50, 30)},
-     {"key": "拢", "label": "拢", "symbol": "", "rect": pygame.Rect(200, 150, 50, 30)},
+     {"key": "£", "label": "£", "symbol": "", "rect": pygame.Rect(200, 150, 50, 30)},
      {"key": "$", "label": "$", "symbol": "", "rect": pygame.Rect(260, 150, 50, 30)},
      {"key": "%", "label": "%", "symbol": "", "rect": pygame.Rect(320, 150, 50, 30)},
      {"key": "^", "label": "^", "symbol": "", "rect": pygame.Rect(380, 150, 50, 30)},
