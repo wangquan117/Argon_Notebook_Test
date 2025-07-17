@@ -47,12 +47,20 @@ if ! command -v pip3 &> /dev/null; then
     }
 fi
 
+# Install JPEG development package
+echo "Installing libjpeg62-turbo-dev..."
+sudo apt-get install libjpeg62-turbo-dev -y || {
+    echo "Failed to install libjpeg62-turbo-dev. Please install it manually." >&2
+    exit 1
+}
+
 # Upgrade Pillow with system package compatibility
 echo "Upgrading Pillow library..."
 pip3 install --upgrade Pillow --break-system-packages || {
     echo "Warning: Failed to upgrade Pillow library. Some features may not work properly." >&2
     echo "You may try running manually with: pip3 install --upgrade Pillow --break-system-packages" >&2
 }
+
 
 # Create installation directory
 echo "Creating installation directory: $INSTALL_DIR"
