@@ -410,6 +410,195 @@ def run_flow_light(output_text):
         output_text.insert(tk.END, f"Error running flow light test: {str(e)}\n", "error")
         return f"run_flow light____NO: {str(e)}"
 
+def run_full_load_test(output_text, progress_bar, run_button):
+    """Run full load test with stress and temperature monitoring"""
+    run_button.config(state=tk.DISABLED)
+    output_text.delete(1.0, tk.END)
+
+    progress_bar['value'] = 0
+    progress_bar.update()  
+    
+    try:
+
+        output_text.insert(tk.END, "Installing required dependencies...\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+        
+
+        try:
+            subprocess.run(["sudo", "apt", "install", "-y", "stress"], 
+                          check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            output_text.insert(tk.END, f"Error installing stress: {e.stderr.decode()}\n", "error")
+            return False
+        
+
+        try:
+            subprocess.run(["pip3", "install", "stressberry", "--user", "--break-system-packages"], 
+                          check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(["pip3", "install", "--upgrade", "numpy", "--break-system-packages"], 
+                          check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            output_text.insert(tk.END, f"Error installing Python packages: {e.stderr.decode()}\n", "error")
+            return False
+        
+
+        home_dir = os.path.expanduser("~")
+        test_dir = os.path.join(home_dir, "TemperatureTests")
+        if not os.path.exists(test_dir):
+            os.makedirs(test_dir)
+        
+
+        output_text.insert(tk.END, "Starting full load test (30 minutes)...\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+        
+
+        stress_cmd = [
+            os.path.join(home_dir, ".local", "bin", "stressberry-run"),
+            "-n", "Full Load Test",
+            "-d", "1800",  
+            "-i", "300",  
+            "-c", "4",     
+            "mytest.out"
+        ]
+        
+        
+        output_text.insert(tk.END, f"Running command: {' '.join(stress_cmd)}\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+        
+     
+        process = subprocess.Popen(
+            stress_cmd,
+            cwd=test_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,  
+            universal_newlines=True
+        )
+        
+
+        start_time = time.time()
+        total_time = 1800  
+        last_update = time.time()
+        
+
+        while True:
+            if process.poll() is not None:
+                break
+
+            line = process.stdout.readline()
+            if line:
+                output_text.insert(tk.END, line)
+                output_text.see(tk.END)
+                output_text.update()
+                last_update = time.time()
+
+            elapsed = time.time() - start_time
+            progress = min(100, (elapsed / total_time) * 100)
+            progress_bar['value'] = progress
+
+            if time.time() - last_update > 5:
+                mins, secs = divmod(int(elapsed), 60)
+                output_text.insert(tk.END, f"?? Test running: {mins} min {secs} sec | Progress: {int(progress)}%\n", "info")
+                output_text.see(tk.END)
+                output_text.update()
+                last_update = time.time()
+
+            time.sleep(0.1)
+
+            if exit_program_event.is_set():
+                process.terminate()
+                output_text.insert(tk.END, "Test interrupted by user\n", "warning")
+                return False
+
+        for line in process.stdout:
+            output_text.insert(tk.END, line)
+            output_text.see(tk.END)
+            output_text.update()
+
+        if process.returncode != 0:
+            output_text.insert(tk.END, f"? Full load test failed with exit code: {process.returncode}\n", "error")
+            return False
+
+        progress_bar['value'] = 95
+        output_text.insert(tk.END, "\nGenerating temperature graph...\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+        
+        plot_cmd = [
+            "MPLBACKEND=Agg",
+            os.path.join(home_dir, ".local", "bin", "stressberry-plot"),
+            "mytest.out",
+            "-f",
+            "-d", "300",
+            "-f",
+            "-l", "400", "2600",
+            "-t", "30", "90",
+            "-o", "mytest.png",
+            "--not-transparent"
+        ]
+        
+        output_text.insert(tk.END, f"Running command: {' '.join(plot_cmd)}\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+        
+        plot_process = subprocess.Popen(
+            " ".join(plot_cmd),
+            cwd=test_dir,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+
+        while True:
+            line = plot_process.stdout.readline()
+            if not line:
+                break
+            output_text.insert(tk.END, line)
+            output_text.see(tk.END)
+            output_text.update()
+        
+        plot_process.wait()
+        
+        if plot_process.returncode != 0:
+            output_text.insert(tk.END, f"Graph generation failed with exit code: {plot_process.returncode}\n", "error")
+            return False
+        
+ 
+        progress_bar['value'] = 100
+        output_path = os.path.join(test_dir, "mytest.png")
+        output_text.insert(tk.END, f"\nFull load test completed successfully!\n", "success")
+        output_text.insert(tk.END, f"Temperature graph saved to: {output_path}\n", "info")
+        
+
+        def open_image():
+            if os.path.exists(output_path):
+                webbrowser.open(f"file://{output_path}")
+            else:
+                messagebox.showerror("Error", "Image file not found!")
+        
+        open_button = ttk.Button(
+            output_text.winfo_toplevel(), 
+            text="Open Temperature Graph", 
+            command=open_image
+        )
+        open_button.pack(pady=10)
+        
+        return True
+    except Exception as e:
+        output_text.insert(tk.END, f"Error in full load test: {str(e)}\n", "error")
+        traceback.print_exc()
+        return False
+    finally:
+        run_button.config(state=tk.NORMAL)          
+
 def run_all_tests(output_text, progress_bar, run_button):
     """Run all tests sequentially and report results"""
     run_button.config(state=tk.DISABLED)
@@ -540,6 +729,7 @@ def cleanup_and_exit(root):
     messagebox.showinfo("Cleanup completed", message)
     root.destroy()
 
+    
 def create_gui():
     """Create the main GUI for the Argon One Test Toolkit"""
     root = tk.Tk()
@@ -597,10 +787,26 @@ def create_gui():
             daemon=True).start()
     )
     run_all_button.pack(fill=tk.X, expand=True)
+ 
+    # Full Load Test button (full width)
+    full_load_frame = ttk.Frame(button_container)
+    full_load_frame.pack(fill=tk.X, pady=(0, 10))
+    
+    full_load_button = ttk.Button(
+        full_load_frame, 
+        text="Full-load Test", 
+        style="Big.TButton",
+        command=lambda: threading.Thread(
+            target=run_full_load_test, 
+            args=(output_text, progress_bar, full_load_button), 
+            daemon=True).start()
+    )
+    full_load_button.pack(fill=tk.X, expand=True) 
     
     # Other test buttons in a grid
     test_buttons_frame = ttk.Frame(button_container)
     test_buttons_frame.pack(fill=tk.X)
+        
     
     test_buttons = [
         ("Keyboard Test", lambda: threading.Thread(target=run_key_board, args=(output_text,), daemon=True).start()),
@@ -658,6 +864,14 @@ def create_gui():
     # Initial message
     output_text.insert(tk.END, "Argon One Test Toolkit v1.0\n", "bold")
     output_text.insert(tk.END, "Ready to run tests. Select a test from the buttons above.\n\n")
+    
+    output_text.insert(tk.END, "Full-load Test Instructions:\n", "bold")
+    output_text.insert(tk.END, "1. This test will install stress and stressberry if not already installed\n")
+    output_text.insert(tk.END, "2. It will create a directory ~/TemperatureTests\n")
+    output_text.insert(tk.END, "3. Run a 30-minute full load test on 4 cores\n")
+    output_text.insert(tk.END, "4. Generate a temperature graph after completion\n")
+    output_text.insert(tk.END, "Note: This test will take approximately 30 minutes to complete\n\n")    
+    
     # Check dependencies
     deps_ok, missing = check_dependencies()
     if not deps_ok:
