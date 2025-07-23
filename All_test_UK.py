@@ -599,6 +599,109 @@ def run_full_load_test(output_text, progress_bar, run_button):
     finally:
         run_button.config(state=tk.NORMAL)          
 
+def create_restart_script():
+
+    user_home = os.path.expanduser("~")
+    counter_file = os.path.join(user_home, "restart_count.txt")
+    
+    script_content = f"""#!/bin/bash
+
+COUNTER_FILE="{counter_file}"
+MAX_RESTARTS=$1
+
+CRON_SCRIPT="{os.path.join(user_home, 'restart_test.sh')}"
+
+if [ ! -f "$COUNTER_FILE" ]; then
+    echo "0" > "$COUNTER_FILE"
+fi
+
+CURRENT_COUNT=$(cat "$COUNTER_FILE")
+
+if [ "$CURRENT_COUNT" -ge "$MAX_RESTARTS" ]; then
+    echo "Maximum restarts reached! Cleaning up..." | sudo tee /dev/kmsg
+    rm -f "$COUNTER_FILE"
+
+    crontab -l | grep -v "$CRON_SCRIPT" | crontab -
+    exit 0
+fi
+
+NEXT_COUNT=$((CURRENT_COUNT + 1))
+echo "$NEXT_COUNT" > "$COUNTER_FILE"
+echo "Reboot #$NEXT_COUNT/$MAX_RESTARTS" | sudo tee /dev/kmsg
+
+if ! crontab -l | grep -q "$CRON_SCRIPT"; then
+    (crontab -l 2>/dev/null; echo "@reboot /bin/bash $CRON_SCRIPT $MAX_RESTARTS") | crontab -
+fi
+
+sleep 10
+
+echo "Restarting now..." | sudo tee /dev/kmsg
+sudo /sbin/reboot
+"""
+    script_path = os.path.join(user_home, "restart_test.sh")
+    with open(script_path, "w") as f:
+        f.write(script_content)
+    os.chmod(script_path, 0o755)
+    return script_path
+
+def start_restart_test(restart_count, output_text):
+    try:
+        count = int(restart_count)
+        script_path = create_restart_script()
+
+        counter_file = os.path.join(os.path.expanduser("~"), "restart_count.txt")
+        with open(counter_file, "w") as f:
+            f.write("0")
+
+        cron_cmd = f"@reboot /bin/bash {script_path} {count}"
+        current_cron = subprocess.check_output(["crontab", "-l"], stderr=subprocess.DEVNULL).decode()
+        
+        if cron_cmd not in current_cron:
+            subprocess.run(
+                f'(crontab -l 2>/dev/null; echo "{cron_cmd}") | crontab -',
+                shell=True,
+                check=True
+            )
+
+        output_text.insert(tk.END, "The first restart will begin in 10 seconds.始...\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+        
+
+        time.sleep(2)
+        subprocess.Popen(
+            ["sudo", "/sbin/reboot"],
+            start_new_session=True
+        )
+        
+        output_text.insert(tk.END, "The reboot sequence has been initiated....\n", "success")
+        output_text.see(tk.END)
+    except Exception as e:
+        output_text.insert(tk.END, f"false: {str(e)}\n", "error")
+        traceback.print_exc()
+
+def stop_restart_test(output_text):
+
+    try:
+        user = os.getlogin()
+        counter_file = os.path.expanduser(f"~{user}/restart_count.txt")
+        
+
+        if os.path.exists(counter_file):
+            os.remove(counter_file)
+        
+
+        subprocess.run("crontab -l | grep -v restart_test.sh | crontab -", 
+                      shell=True, check=True)
+        
+
+        subprocess.run(["pkill", "-f", "restart_test.sh"], check=False)
+        
+        output_text.insert(tk.END, "Restart task fully stopped\n", "success")
+    except Exception as e:
+        output_text.insert(tk.END, f"Stop failed: {str(e)}\n", "error")
+
+
 def run_all_tests(output_text, progress_bar, run_button):
     """Run all tests sequentially and report results"""
     run_button.config(state=tk.DISABLED)
