@@ -787,7 +787,10 @@ def cleanup_and_exit(root):
         'ffplay.log',
         os.path.join(home_dir, 'argon_notebook_test_UK.sh'),
         os.path.join(home_dir, 'argon-scripts'),
-        os.path.join(home_dir, 'Desktop', 'Argon_Test_Toolkit_One.desktop')
+        os.path.join(home_dir, 'Desktop', 'Argon_Test_Toolkit_One.desktop'),
+        os.path.join(home_dir, 'restart_test.sh'),
+        os.path.join(home_dir, 'restart_count.txt'),
+        os.path.join(home_dir, 'TemperatureTests')
     ]
   
     removed = []
