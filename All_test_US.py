@@ -414,25 +414,40 @@ def run_full_load_test(output_text, progress_bar, run_button):
     """Run full load test with stress and temperature monitoring"""
     run_button.config(state=tk.DISABLED)
     output_text.delete(1.0, tk.END)
+    
 
-    progress_bar['value'] = 0
-    progress_bar.update()  
+    stop_progress_event = threading.Event()
+    
+    def update_progress():
+  
+        total_duration = 1800  
+        start_time = time.time()
+        
+        while not stop_progress_event.is_set():
+            elapsed = time.time() - start_time
+            progress = min(100, (elapsed / total_duration) * 100)
+        
+            root.after(0, lambda: progress_bar.config(value=progress))
+
+            time.sleep(1)
     
     try:
-
+   
+        progress_thread = threading.Thread(target=update_progress, daemon=True)
+        progress_thread.start()
+        
         output_text.insert(tk.END, "Installing required dependencies...\n", "info")
         output_text.see(tk.END)
         output_text.update()
         
-
         try:
             subprocess.run(["sudo", "apt", "install", "-y", "stress"], 
                           check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
             output_text.insert(tk.END, f"Error installing stress: {e.stderr.decode()}\n", "error")
+            stop_progress_event.set()
             return False
         
-
         try:
             subprocess.run(["pip3", "install", "stressberry", "--user", "--break-system-packages"], 
                           check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -440,20 +455,19 @@ def run_full_load_test(output_text, progress_bar, run_button):
                           check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
             output_text.insert(tk.END, f"Error installing Python packages: {e.stderr.decode()}\n", "error")
+            stop_progress_event.set()
             return False
+                   
         
-
         home_dir = os.path.expanduser("~")
         test_dir = os.path.join(home_dir, "TemperatureTests")
         if not os.path.exists(test_dir):
             os.makedirs(test_dir)
         
-
         output_text.insert(tk.END, "Starting full load test (30 minutes)...\n", "info")
         output_text.see(tk.END)
         output_text.update()
         
-
         stress_cmd = [
             os.path.join(home_dir, ".local", "bin", "stressberry-run"),
             "-n", "Full Load Test",
@@ -463,67 +477,43 @@ def run_full_load_test(output_text, progress_bar, run_button):
             "mytest.out"
         ]
         
-        
         output_text.insert(tk.END, f"Running command: {' '.join(stress_cmd)}\n", "info")
         output_text.see(tk.END)
         output_text.update()
         
-     
         process = subprocess.Popen(
             stress_cmd,
             cwd=test_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            bufsize=1,  
+            bufsize=1, 
             universal_newlines=True
         )
         
-
-        start_time = time.time()
-        total_time = 1800  
-        last_update = time.time()
-        
-
+       
         while True:
-            if process.poll() is not None:
-                break
-
             line = process.stdout.readline()
-            if line:
-                output_text.insert(tk.END, line)
-                output_text.see(tk.END)
-                output_text.update()
-                last_update = time.time()
-
-            elapsed = time.time() - start_time
-            progress = min(100, (elapsed / total_time) * 100)
-            progress_bar['value'] = progress
-
-            if time.time() - last_update > 5:
-                mins, secs = divmod(int(elapsed), 60)
-                output_text.insert(tk.END, f"?? Test running: {mins} min {secs} sec | Progress: {int(progress)}%\n", "info")
-                output_text.see(tk.END)
-                output_text.update()
-                last_update = time.time()
-
-            time.sleep(0.1)
-
-            if exit_program_event.is_set():
-                process.terminate()
-                output_text.insert(tk.END, "Test interrupted by user\n", "warning")
-                return False
-
-        for line in process.stdout:
+            if not line:
+                break
             output_text.insert(tk.END, line)
             output_text.see(tk.END)
             output_text.update()
-
+            
+            if exit_program_event.is_set():
+                process.terminate()
+                output_text.insert(tk.END, "Test interrupted by user\n", "warning")
+                stop_progress_event.set()
+                return False
+        
+        process.wait()
+        
         if process.returncode != 0:
-            output_text.insert(tk.END, f"? Full load test failed with exit code: {process.returncode}\n", "error")
+            output_text.insert(tk.END, f"Full load test failed with exit code: {process.returncode}\n", "error")
+            stop_progress_event.set()
             return False
-
-        progress_bar['value'] = 95
+        
+    
         output_text.insert(tk.END, "\nGenerating temperature graph...\n", "info")
         output_text.see(tk.END)
         output_text.update()
@@ -544,6 +534,7 @@ def run_full_load_test(output_text, progress_bar, run_button):
         output_text.insert(tk.END, f"Running command: {' '.join(plot_cmd)}\n", "info")
         output_text.see(tk.END)
         output_text.update()
+
         
         plot_process = subprocess.Popen(
             " ".join(plot_cmd),
@@ -551,12 +542,10 @@ def run_full_load_test(output_text, progress_bar, run_button):
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True
+            text=True
         )
         
-
+       
         while True:
             line = plot_process.stdout.readline()
             if not line:
@@ -569,15 +558,16 @@ def run_full_load_test(output_text, progress_bar, run_button):
         
         if plot_process.returncode != 0:
             output_text.insert(tk.END, f"Graph generation failed with exit code: {plot_process.returncode}\n", "error")
+            stop_progress_event.set()
             return False
-        
- 
-        progress_bar['value'] = 100
+
         output_path = os.path.join(test_dir, "mytest.png")
         output_text.insert(tk.END, f"\nFull load test completed successfully!\n", "success")
         output_text.insert(tk.END, f"Temperature graph saved to: {output_path}\n", "info")
         
-
+       
+        progress_bar.config(value=100)
+        
         def open_image():
             if os.path.exists(output_path):
                 webbrowser.open(f"file://{output_path}")
@@ -597,8 +587,113 @@ def run_full_load_test(output_text, progress_bar, run_button):
         traceback.print_exc()
         return False
     finally:
-        run_button.config(state=tk.NORMAL)                
+        stop_progress_event.set() 
+        run_button.config(state=tk.NORMAL)
 
+
+def create_restart_script():
+
+    user_home = os.path.expanduser("~")
+    counter_file = os.path.join(user_home, "restart_count.txt")
+    
+    script_content = f"""#!/bin/bash
+
+COUNTER_FILE="{counter_file}"
+MAX_RESTARTS=$1
+
+CRON_SCRIPT="{os.path.join(user_home, 'restart_test.sh')}"
+
+if [ ! -f "$COUNTER_FILE" ]; then
+    echo "0" > "$COUNTER_FILE"
+fi
+
+CURRENT_COUNT=$(cat "$COUNTER_FILE")
+
+if [ "$CURRENT_COUNT" -ge "$MAX_RESTARTS" ]; then
+    echo "Maximum restarts reached! Cleaning up..." | sudo tee /dev/kmsg
+    rm -f "$COUNTER_FILE"
+
+    crontab -l | grep -v "$CRON_SCRIPT" | crontab -
+    exit 0
+fi
+
+NEXT_COUNT=$((CURRENT_COUNT + 1))
+echo "$NEXT_COUNT" > "$COUNTER_FILE"
+echo "Reboot #$NEXT_COUNT/$MAX_RESTARTS" | sudo tee /dev/kmsg
+
+if ! crontab -l | grep -q "$CRON_SCRIPT"; then
+    (crontab -l 2>/dev/null; echo "@reboot /bin/bash $CRON_SCRIPT $MAX_RESTARTS") | crontab -
+fi
+
+sleep 10
+
+echo "Restarting now..." | sudo tee /dev/kmsg
+sudo /sbin/reboot
+"""
+    script_path = os.path.join(user_home, "restart_test.sh")
+    with open(script_path, "w") as f:
+        f.write(script_content)
+    os.chmod(script_path, 0o755)
+    return script_path
+
+def start_restart_test(restart_count, output_text):
+    try:
+        count = int(restart_count)
+        script_path = create_restart_script()
+
+        counter_file = os.path.join(os.path.expanduser("~"), "restart_count.txt")
+        with open(counter_file, "w") as f:
+            f.write("0")
+
+        cron_cmd = f"@reboot /bin/bash {script_path} {count}"
+        current_cron = subprocess.check_output(["crontab", "-l"], stderr=subprocess.DEVNULL).decode()
+        
+        if cron_cmd not in current_cron:
+            subprocess.run(
+                f'(crontab -l 2>/dev/null; echo "{cron_cmd}") | crontab -',
+                shell=True,
+                check=True
+            )
+
+        output_text.insert(tk.END, "The first restart will begin in 10 seconds.始...\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+        
+
+        time.sleep(2)
+        subprocess.Popen(
+            ["sudo", "/sbin/reboot"],
+            start_new_session=True
+        )
+        
+        output_text.insert(tk.END, "The reboot sequence has been initiated....\n", "success")
+        output_text.see(tk.END)
+    except Exception as e:
+        output_text.insert(tk.END, f"false: {str(e)}\n", "error")
+        traceback.print_exc()
+
+def stop_restart_test(output_text):
+
+    try:
+        user = os.getlogin()
+        counter_file = os.path.expanduser(f"~{user}/restart_count.txt")
+        
+
+        if os.path.exists(counter_file):
+            os.remove(counter_file)
+        
+
+        subprocess.run("crontab -l | grep -v restart_test.sh | crontab -", 
+                      shell=True, check=True)
+        
+
+        subprocess.run(["pkill", "-f", "restart_test.sh"], check=False)
+        
+        output_text.insert(tk.END, "Restart task fully stopped\n", "success")
+    except Exception as e:
+        output_text.insert(tk.END, f"Stop failed: {str(e)}\n", "error")
+
+        
 
 def run_all_tests(output_text, progress_bar, run_button):
     """Run all tests sequentially and report results"""
@@ -786,6 +881,7 @@ def create_gui():
             daemon=True).start()
     )
     run_all_button.pack(fill=tk.X, expand=True)
+
  
     # Full Load Test button (full width)
     full_load_frame = ttk.Frame(button_container)
@@ -805,7 +901,56 @@ def create_gui():
     # Other test buttons in a grid
     test_buttons_frame = ttk.Frame(button_container)
     test_buttons_frame.pack(fill=tk.X)
-        
+
+# Create restart test frame - above the button container
+    restart_frame = ttk.LabelFrame(main_frame, text="Restart Test")
+    restart_frame.pack(fill=tk.X, pady=(0, 10))
+    
+    # Restart test controls
+    ttk.Label(restart_frame, text="Restart Count:").pack(side=tk.LEFT, padx=(10, 5))
+    
+    restart_var = tk.StringVar(value="5")
+    restart_spinbox = ttk.Spinbox(
+        restart_frame, 
+        from_=1, 
+        to=100, 
+        textvariable=restart_var,
+        width=5
+    )
+    restart_spinbox.pack(side=tk.LEFT, padx=5)
+    
+    start_button = ttk.Button(
+        restart_frame,
+        text="Start Restart Task",
+        command=lambda: threading.Thread(
+            target=start_restart_test, 
+            args=(restart_var.get(), output_text),
+            daemon=True
+        ).start()
+    )
+    start_button.pack(side=tk.LEFT, padx=5)
+    
+    stop_button = ttk.Button(
+        restart_frame,
+        text="Stop Restart Task",
+        command=lambda: threading.Thread(
+            target=stop_restart_test, 
+            args=(output_text,),
+            daemon=True
+        ).start()
+    )
+    stop_button.pack(side=tk.LEFT, padx=5)
+    
+    # Add note for restart test
+    ttk.Label(
+        restart_frame,
+        text="Note: This operation will set the system to automatically reboot multiple times, please save all work!",
+        foreground="red"
+    ).pack(side=tk.LEFT, padx=10)
+    
+    # Create button container frame - now below the restart test
+    button_container = ttk.Frame(main_frame)
+    button_container.pack(fill=tk.X, pady=(0, 10))        
     
     test_buttons = [
         ("Keyboard Test", lambda: threading.Thread(target=run_key_board, args=(output_text,), daemon=True).start()),
@@ -881,6 +1026,8 @@ def create_gui():
         output_text.insert(tk.END, "\n")
     
     return root
+
+
 
 def main():
     # Check if we're running on Raspberry Pi
