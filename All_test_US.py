@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, PhotoImage
 import webbrowser
 from PIL import Image, ImageTk
+import tempfile
 
 exit_program_event = threading.Event()
 TEST_SCRIPTS_DIR = "argon-scripts/Argon_Notebook_Test-main"
@@ -646,21 +647,26 @@ def start_restart_test(restart_count, output_text):
             f.write("0")
 
         cron_cmd = f"@reboot /bin/bash {script_path} {count}"
-        current_cron = subprocess.check_output(["crontab", "-l"], stderr=subprocess.DEVNULL).decode()
+
+        try:
+            current_cron = subprocess.check_output(["crontab", "-l"], 
+                                                 stderr=subprocess.DEVNULL).decode()
+        except subprocess.CalledProcessError:
+            current_cron = ""  
         
         if cron_cmd not in current_cron:
-            subprocess.run(
-                f'(crontab -l 2>/dev/null; echo "{cron_cmd}") | crontab -',
-                shell=True,
-                check=True
-            )
+            with tempfile.NamedTemporaryFile(mode="w+") as tmp:
+                if current_cron.strip():
+                    tmp.write(current_cron + "\n")
+                tmp.write(cron_cmd + "\n")
+                tmp.flush()
+                subprocess.run(["crontab", tmp.name], check=True)
 
         output_text.insert(tk.END, "The first restart will begin in 10 seconds.濮?..\n", "info")
         output_text.see(tk.END)
         output_text.update()
-        
 
-        time.sleep(2)
+        time.sleep(10)
         subprocess.Popen(
             ["sudo", "/sbin/reboot"],
             start_new_session=True
@@ -671,28 +677,33 @@ def start_restart_test(restart_count, output_text):
     except Exception as e:
         output_text.insert(tk.END, f"false: {str(e)}\n", "error")
         traceback.print_exc()
-
 def stop_restart_test(output_text):
-
     try:
-        user = os.getlogin()
-        counter_file = os.path.expanduser(f"~{user}/restart_count.txt")
-        
+        home_dir = os.path.expanduser("~")
+        counter_file = os.path.join(home_dir, "restart_count.txt")
 
         if os.path.exists(counter_file):
             os.remove(counter_file)
-        
 
-        subprocess.run("crontab -l | grep -v restart_test.sh | crontab -", 
-                      shell=True, check=True)
-        
+        try:
+            current_cron = subprocess.check_output(["crontab", "-l"], 
+                                                  stderr=subprocess.DEVNULL).decode()
+        except subprocess.CalledProcessError:
+            current_cron = ""  
+
+        new_cron = "\n".join([line for line in current_cron.splitlines() 
+                             if "restart_test.sh" not in line])
+
+        with tempfile.NamedTemporaryFile(mode="w+") as tmp:
+            tmp.write(new_cron)
+            tmp.flush()
+            subprocess.run(["crontab", tmp.name], check=True)
 
         subprocess.run(["pkill", "-f", "restart_test.sh"], check=False)
         
         output_text.insert(tk.END, "Restart task fully stopped\n", "success")
     except Exception as e:
         output_text.insert(tk.END, f"Stop failed: {str(e)}\n", "error")
-
         
 
 def run_all_tests(output_text, progress_bar, run_button):
