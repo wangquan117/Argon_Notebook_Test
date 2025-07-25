@@ -655,7 +655,7 @@ def start_restart_test(restart_count, output_text):
                 check=True
             )
 
-        output_text.insert(tk.END, "The first restart will begin in 10 seconds.始...\n", "info")
+        output_text.insert(tk.END, "The first restart will begin in 10 seconds.濮?..\n", "info")
         output_text.see(tk.END)
         output_text.update()
         
