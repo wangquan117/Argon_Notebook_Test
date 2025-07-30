@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, PhotoImage
 import webbrowser
 from PIL import Image, ImageTk
+import tempfile
 
 exit_program_event = threading.Event()
 TEST_SCRIPTS_DIR = "argon-scripts/Argon_Notebook_Test-main"
@@ -59,6 +60,11 @@ def check_dependencies():
         subprocess.run(["which", "ddcutil"], check=True, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         missing.append("ddcutil (install with: sudo apt install -y ddcutil)")
+    try:
+        subprocess.run(["which", "cheese"], check=True, stdout=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        missing.append("cheese (install with: sudo apt install -y cheese)")        
+        
     if missing:
         return False, missing
     return True, []
@@ -212,51 +218,50 @@ def run_screen_rgb(output_text):
         return f"run_screen_rgb____NO: {str(e)}"
         
 def run_camera(stop_event, output_text):
-    """Run camera test with GUI output"""
-    output_text.insert(tk.END, "\nStarting Camera Test...\n", "info")
-    output_text.see(tk.END)
-    output_text.update()
-    
-    
+    """Run camera test using Cheese"""
     try:
-        display = os.environ.get('DISPLAY')
-        if not display:
-            raise Exception("No display available (DISPLAY not set). Set it with: export DISPLAY=:0")
         if not os.path.exists("/dev/video0"):
-            raise Exception("/dev/video0 not found. Check camera connection or load v4l2loopback.")
-        output_text.insert(tk.END, f"Using display: {display}\n", "info")
 
-        output_text.insert(tk.END, "\nStarting real-time video recording and playback (press 'q' in ffplay to return to main menu)...\n", "info")
+            subprocess.run(["sudo", "modprobe", "bcm2835-v4l2"], check=False)
+            time.sleep(2)
+            if not os.path.exists("/dev/video0"):
+                raise Exception("/dev/video0 not found. Check camera connection and enable in raspi-config")
+
+        output_text.insert(tk.END, "\nStarting Camera Test with Cheese...\n", "info")
         output_text.see(tk.END)
         output_text.update()
-        
-        with open("ffmpeg.log", "w") as ffmpeg_log, open("ffplay.log", "w") as ffplay_log:
-            ffmpeg_process = subprocess.Popen(
-                ["ffmpeg", "-y", "-i", "/dev/video0", "-f", "mjpeg", "-"],
-                stdout=subprocess.PIPE,
-                stderr=ffmpeg_log,
-                bufsize=0,
-                close_fds=True
-            )
-            ffplay_process = subprocess.Popen(
-                ["ffplay", "-i", "-", "-fflags", "nobuffer", "-autoexit"],
-                stdin=ffmpeg_process.stdout,
-                stderr=ffplay_log,
-                close_fds=True
-            )
-            ffplay_process.wait()
-            ffmpeg_process.terminate()
-            try:
-                ffmpeg_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                ffmpeg_process.kill()
-                output_text.insert(tk.END, "ffmpeg process killed due to timeout\n", "warning")
-        
-        output_text.insert(tk.END, "Camera test completed successfully!\n", "success")
-        return "run_camera____YES"
+
+        cheese_process = subprocess.Popen(
+            ["cheese"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+
+        output_text.insert(tk.END, "Camera test running. Close Cheese to complete test...\n", "info")
+        while True:
+            if cheese_process.poll() is not None: 
+                break
+            if stop_event.is_set():  
+                cheese_process.terminate()
+                output_text.insert(tk.END, "Camera test interrupted by user.\n", "warning")
+                return "run_camera____INTERRUPTED"
+
+#            line = cheese_process.stdout.readline()
+#            if line:
+#                output_text.insert(tk.END, line)
+#                output_text.see(tk.END)
+#                output_text.update()
+#            time.sleep(0.1)  
+
+        if cheese_process.returncode == 0:
+            output_text.insert(tk.END, "Camera test completed successfully!\n", "success")
+            return "run_camera____YES"
+        else:
+            output_text.insert(tk.END, f"Camera test exited with code {cheese_process.returncode}\n", "warning")
+            return f"run_camera____NO: Exit code {cheese_process.returncode}"
+            
     except Exception as e:
-        if stop_event:
-            stop_event.set()
         output_text.insert(tk.END, f"Error in camera test: {str(e)}\n", "error")
         return f"run_camera____NO: {str(e)}"
         
@@ -591,7 +596,6 @@ def run_full_load_test(output_text, progress_bar, run_button):
         run_button.config(state=tk.NORMAL)         
 
 def create_restart_script():
-
     user_home = os.path.expanduser("~")
     counter_file = os.path.join(user_home, "restart_count.txt")
     
@@ -601,9 +605,10 @@ COUNTER_FILE="{counter_file}"
 MAX_RESTARTS=$1
 
 CRON_SCRIPT="{os.path.join(user_home, 'restart_test.sh')}"
+NOTIFY_SCRIPT="{os.path.join(user_home, 'show_notification.sh')}"
 
 if [ ! -f "$COUNTER_FILE" ]; then
-    echo "0" > "$COUNTER_FILE"
+    echo "1" > "$COUNTER_FILE"
 fi
 
 CURRENT_COUNT=$(cat "$COUNTER_FILE")
@@ -611,8 +616,33 @@ CURRENT_COUNT=$(cat "$COUNTER_FILE")
 if [ "$CURRENT_COUNT" -ge "$MAX_RESTARTS" ]; then
     echo "Maximum restarts reached! Cleaning up..." | sudo tee /dev/kmsg
     rm -f "$COUNTER_FILE"
-
     crontab -l | grep -v "$CRON_SCRIPT" | crontab -
+    
+    # Create persistent notification script
+    echo '#!/bin/bash' > "$NOTIFY_SCRIPT"
+    echo 'export DISPLAY=:0' >> "$NOTIFY_SCRIPT"
+    echo '# Show desktop notification (will auto-close after 10 seconds)' >> "$NOTIFY_SCRIPT"
+    echo 'notify-send "Restart Test Completed" "Successfully completed $MAX_RESTARTS reboots!" -i dialog-information -t 10000' >> "$NOTIFY_SCRIPT"
+    echo '# Show persistent dialog that stays until manually closed' >> "$NOTIFY_SCRIPT"
+    echo 'zenity --info --text="Restart test completed after $MAX_RESTARTS reboots.\n\nClick OK to close this notification." --title="Test Completed" --width=400 --height=200' >> "$NOTIFY_SCRIPT"
+    echo '# Clean up only the autostart entry (keep notification script)' >> "$NOTIFY_SCRIPT"
+    echo 'rm -f ~/.config/autostart/restart_notifier.desktop' >> "$NOTIFY_SCRIPT"
+    chmod +x "$NOTIFY_SCRIPT"
+    
+    # Add to autostart
+    mkdir -p ~/.config/autostart
+    echo "[Desktop Entry]
+Type=Application
+Exec=$NOTIFY_SCRIPT
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name[en_US]=Restart Test Notifier
+Name=Restart Test Notifier
+Comment[en_US]=Notify restart test completion
+Comment=Notify restart test completion" > ~/.config/autostart/restart_notifier.desktop
+
+    
     exit 0
 fi
 
@@ -625,7 +655,6 @@ if ! crontab -l | grep -q "$CRON_SCRIPT"; then
 fi
 
 sleep 10
-
 echo "Restarting now..." | sudo tee /dev/kmsg
 sudo /sbin/reboot
 """
@@ -638,6 +667,8 @@ sudo /sbin/reboot
 def start_restart_test(restart_count, output_text):
     try:
         count = int(restart_count)
+        if count < 1:
+            raise ValueError("Restart count must be at least 1")
         script_path = create_restart_script()
 
         counter_file = os.path.join(os.path.expanduser("~"), "restart_count.txt")
@@ -647,10 +678,9 @@ def start_restart_test(restart_count, output_text):
         cron_cmd = f"@reboot /bin/bash {script_path} {count}"
 
         try:
-            current_cron = subprocess.check_output(["crontab", "-l"], 
-                                                 stderr=subprocess.DEVNULL).decode()
+            current_cron = subprocess.check_output(["crontab", "-l"], stderr=subprocess.DEVNULL).decode()
         except subprocess.CalledProcessError:
-            current_cron = ""  
+            current_cron = ""
         
         if cron_cmd not in current_cron:
             with tempfile.NamedTemporaryFile(mode="w+") as tmp:
@@ -660,21 +690,18 @@ def start_restart_test(restart_count, output_text):
                 tmp.flush()
                 subprocess.run(["crontab", tmp.name], check=True)
 
-        output_text.insert(tk.END, "The first restart will begin in 10 seconds.婵?..\n", "info")
+        output_text.insert(tk.END, "The first restart will begin in 10 seconds...\n", "info")
         output_text.see(tk.END)
         output_text.update()
 
         time.sleep(10)
-        subprocess.Popen(
-            ["sudo", "/sbin/reboot"],
-            start_new_session=True
-        )
+        subprocess.Popen(["sudo", "/sbin/reboot"], start_new_session=True)
         
         output_text.insert(tk.END, "The reboot sequence has been initiated....\n", "success")
-        output_text.see(tk.END)
     except Exception as e:
         output_text.insert(tk.END, f"false: {str(e)}\n", "error")
         traceback.print_exc()
+
 def stop_restart_test(output_text):
     try:
         home_dir = os.path.expanduser("~")
@@ -703,7 +730,6 @@ def stop_restart_test(output_text):
     except Exception as e:
         output_text.insert(tk.END, f"Stop failed: {str(e)}\n", "error")
 
-
 def run_all_tests(output_text, progress_bar, run_button):
     """Run all tests sequentially and report results"""
     run_button.config(state=tk.DISABLED)
@@ -712,14 +738,13 @@ def run_all_tests(output_text, progress_bar, run_button):
    
     stop_event = threading.Event()
     
-    
     test_cases = [
         ("Keyboard Detection", lambda: run_key_board(output_text)),
         ("Screen RGB Detection", lambda: run_screen_rgb(output_text)),
         ("Electricity Power Detection", lambda: run_electricity_power(output_text)),
         ("Flow Light Test", lambda: run_flow_light(output_text)),
-        ("Media Recording Test", lambda: run_media_recording(stop_event, output_text)),
-#        ("Camera Test", lambda: run_camera(stop_event, output_text)),
+#        ("Media Recording Test", lambda: run_media_recording(stop_event, output_text)),
+        ("Camera Test", lambda: run_camera(stop_event, output_text)),
 #        ("Audio Test", lambda: run_recording_playback(stop_event, output_text)),
     ]
     
@@ -750,8 +775,12 @@ def run_all_tests(output_text, progress_bar, run_button):
         try:
             result = test_func()
             results.append((name, result))
-            
-          
+
+            if name == "Camera Test":
+
+                output_text.insert(tk.END, "Waiting for Camera Test to complete...\n", "info")
+                output_text.update_idletasks()
+                            
             if "____NO" in result:
                 output_text.insert(tk.END, f"! Test failed, stopping further tests\n", "error")
                 stop_event.set()
@@ -787,6 +816,7 @@ def run_all_tests(output_text, progress_bar, run_button):
     run_button.config(state=tk.NORMAL)
     return True
 
+
 def cleanup_and_exit(root):
       
     home_dir = os.path.expanduser("~")
@@ -801,6 +831,7 @@ def cleanup_and_exit(root):
         os.path.join(home_dir, 'Desktop', 'Argon_Test_Toolkit_One.desktop'),
         os.path.join(home_dir, 'restart_test.sh'),
         os.path.join(home_dir, 'restart_count.txt'),
+        os.path.join(home_dir, 'Videos/Webcam'),
         os.path.join(home_dir, 'TemperatureTests')
     ]
   
