@@ -60,58 +60,92 @@ def check_dependencies():
         subprocess.run(["which", "ddcutil"], check=True, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         missing.append("ddcutil (install with: sudo apt install -y ddcutil)")
+    try:
+        subprocess.run(["which", "cheese"], check=True, stdout=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        missing.append("cheese (install with: sudo apt install -y cheese)")        
+        
     if missing:
         return False, missing
     return True, []
     
 
 def run_media_recording(stop_event, output_text):
-    """Run media recording test with GUI output"""
-    output_text.insert(tk.END, "\nStarting media recording (audio and video) for 6 seconds...\n", "info")
-    output_text.see(tk.END)
-    output_text.update()
-    
+    """Run media recording test using Cheese"""
     try:
-        display = os.environ.get('DISPLAY')
-        if not display:
-            raise Exception("No display available (DISPLAY not set). Set it with: export DISPLAY=:0")
-        if not os.path.exists("/dev/video0"):
-            raise Exception("/dev/video0 not found. Check camera connection or load v4l2loopback.")
-        output_text.insert(tk.END, f"Using display: {display}\n", "info")
+        output_text.insert(tk.END, "\nStarting media recording with Cheese...\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
 
-        output_file = "recorded_media.mp4"
+        if not os.path.exists("/dev/video0"):
+            subprocess.run(["sudo", "modprobe", "bcm2835-v4l2"], check=False)
+            time.sleep(2)
+            if not os.path.exists("/dev/video0"):
+                raise Exception("/dev/video0 not found. Check camera connection and enable in raspi-config")
+
+        output_file = "cheese_recording.webm"
         if os.path.exists(output_file):
             os.remove(output_file)
 
-        # Record audio and video for 10 seconds
-        ffmpeg_process = subprocess.Popen(
-            ["ffmpeg", "-y", "-f", "v4l2", "-i", "/dev/video0", "-f", "alsa", "-i", "default", "-t", "6", output_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
+        cheese_cmd = [
+            "cheese",
+            "--video", output_file,
+            "--width=640", "--height=480",
+            "--duration=10"
+        ]
+        
+        output_text.insert(tk.END, f"Running: {' '.join(cheese_cmd)}\n", "info")
+        cheese_process = subprocess.Popen(
+            cheese_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
         )
-        ffmpeg_process.wait()
 
+        while cheese_process.poll() is None and not stop_event.is_set():
+            line = cheese_process.stdout.readline()
+            if line:
+                output_text.insert(tk.END, line)
+                output_text.see(tk.END)
+                output_text.update()
+        
+        if stop_event.is_set():
+            cheese_process.terminate()
+            output_text.insert(tk.END, "Recording interrupted by user\n", "warning")
+            return "run_media_recording____INTERRUPTED"
+
+        if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
+            raise Exception("Recording failed. No output file created.")
+        
         output_text.insert(tk.END, "\nRecording completed. Starting playback...\n", "info")
         output_text.see(tk.END)
         output_text.update()
-        
-        # Playback the recorded video
+
         ffplay_process = subprocess.Popen(
             ["ffplay", "-autoexit", output_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
         )
-        ffplay_process.wait()
+        
+        while ffplay_process.poll() is None:
+            line = ffplay_process.stdout.readline()
+            if line:
+                output_text.insert(tk.END, line)
+                output_text.see(tk.END)
+                output_text.update()
+        
+        if ffplay_process.returncode != 0:
+            raise Exception("Playback failed")
         
         output_text.insert(tk.END, "Media test completed successfully!\n", "success")
         return "run_media_recording____YES"
+    
     except Exception as e:
         if stop_event:
             stop_event.set()
         output_text.insert(tk.END, f"Error in media recording: {str(e)}\n", "error")
-        return f"run_media_recording____NO: {str(e)}"
+        return f"run_media_recording____NO: {str(e)}"                              
         
 def run_system_update(output_text):
     """Run system update with GUI output"""
@@ -213,51 +247,50 @@ def run_screen_rgb(output_text):
         return f"run_screen_rgb____NO: {str(e)}"
         
 def run_camera(stop_event, output_text):
-    """Run camera test with GUI output"""
-    output_text.insert(tk.END, "\nStarting Camera Test...\n", "info")
-    output_text.see(tk.END)
-    output_text.update()
-    
-    
+    """Run camera test using Cheese"""
     try:
-        display = os.environ.get('DISPLAY')
-        if not display:
-            raise Exception("No display available (DISPLAY not set). Set it with: export DISPLAY=:0")
         if not os.path.exists("/dev/video0"):
-            raise Exception("/dev/video0 not found. Check camera connection or load v4l2loopback.")
-        output_text.insert(tk.END, f"Using display: {display}\n", "info")
 
-        output_text.insert(tk.END, "\nStarting real-time video recording and playback (press 'q' in ffplay to return to main menu)...\n", "info")
+            subprocess.run(["sudo", "modprobe", "bcm2835-v4l2"], check=False)
+            time.sleep(2)
+            if not os.path.exists("/dev/video0"):
+                raise Exception("/dev/video0 not found. Check camera connection and enable in raspi-config")
+
+        output_text.insert(tk.END, "\nStarting Camera Test with Cheese...\n", "info")
         output_text.see(tk.END)
         output_text.update()
-        
-        with open("ffmpeg.log", "w") as ffmpeg_log, open("ffplay.log", "w") as ffplay_log:
-            ffmpeg_process = subprocess.Popen(
-                ["ffmpeg", "-y", "-i", "/dev/video0", "-f", "mjpeg", "-"],
-                stdout=subprocess.PIPE,
-                stderr=ffmpeg_log,
-                bufsize=0,
-                close_fds=True
-            )
-            ffplay_process = subprocess.Popen(
-                ["ffplay", "-i", "-", "-fflags", "nobuffer", "-autoexit"],
-                stdin=ffmpeg_process.stdout,
-                stderr=ffplay_log,
-                close_fds=True
-            )
-            ffplay_process.wait()
-            ffmpeg_process.terminate()
-            try:
-                ffmpeg_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                ffmpeg_process.kill()
-                output_text.insert(tk.END, "ffmpeg process killed due to timeout\n", "warning")
-        
-        output_text.insert(tk.END, "Camera test completed successfully!\n", "success")
-        return "run_camera____YES"
+
+        cheese_process = subprocess.Popen(
+            ["cheese"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+
+        output_text.insert(tk.END, "Camera test running. Close Cheese to complete test...\n", "info")
+        while True:
+            if cheese_process.poll() is not None: 
+                break
+            if stop_event.is_set():  
+                cheese_process.terminate()
+                output_text.insert(tk.END, "Camera test interrupted by user.\n", "warning")
+                return "run_camera____INTERRUPTED"
+
+#            line = cheese_process.stdout.readline()
+#            if line:
+#                output_text.insert(tk.END, line)
+#                output_text.see(tk.END)
+#                output_text.update()
+#            time.sleep(0.1)  
+
+        if cheese_process.returncode == 0:
+            output_text.insert(tk.END, "Camera test completed successfully!\n", "success")
+            return "run_camera____YES"
+        else:
+            output_text.insert(tk.END, f"Camera test exited with code {cheese_process.returncode}\n", "warning")
+            return f"run_camera____NO: Exit code {cheese_process.returncode}"
+            
     except Exception as e:
-        if stop_event:
-            stop_event.set()
         output_text.insert(tk.END, f"Error in camera test: {str(e)}\n", "error")
         return f"run_camera____NO: {str(e)}"
         
@@ -267,18 +300,13 @@ def run_recording_playback(stop_event, output_text):
     output_text.see(tk.END)
     output_text.update()
     
-    
     try:
-        # Install alsa-utils if needed
         try:
             subprocess.run(["sudo", "apt", "install", "-y", "alsa-utils"], 
                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except:
             pass
             
-#        subprocess.run(["amixer", "set", "Master", "75%"], check=False)
-#        subprocess.run(["amixer", "set", "Capture", "75%"], check=False)
-        
         output_text.insert(tk.END, "Recording audio for 5 seconds...\n", "info")
         output_text.see(tk.END)
         output_text.update()
@@ -315,7 +343,8 @@ def run_recording_playback(stop_event, output_text):
         if stop_event:
             stop_event.set()
         output_text.insert(tk.END, f"Error in audio test: {str(e)}\n", "error")
-        return f"run_recording_playback____NO: {str(e)}"  
+        return f"run_recording_playback____NO: {str(e)}"
+
         
 def run_brightness(output_text):
     """Run brightness test with GUI output"""
@@ -593,7 +622,6 @@ def run_full_load_test(output_text, progress_bar, run_button):
 
 
 def create_restart_script():
-
     user_home = os.path.expanduser("~")
     counter_file = os.path.join(user_home, "restart_count.txt")
     
@@ -603,9 +631,10 @@ COUNTER_FILE="{counter_file}"
 MAX_RESTARTS=$1
 
 CRON_SCRIPT="{os.path.join(user_home, 'restart_test.sh')}"
+NOTIFY_SCRIPT="{os.path.join(user_home, 'show_notification.sh')}"
 
 if [ ! -f "$COUNTER_FILE" ]; then
-    echo "0" > "$COUNTER_FILE"
+    echo "1" > "$COUNTER_FILE"
 fi
 
 CURRENT_COUNT=$(cat "$COUNTER_FILE")
@@ -613,8 +642,33 @@ CURRENT_COUNT=$(cat "$COUNTER_FILE")
 if [ "$CURRENT_COUNT" -ge "$MAX_RESTARTS" ]; then
     echo "Maximum restarts reached! Cleaning up..." | sudo tee /dev/kmsg
     rm -f "$COUNTER_FILE"
-
     crontab -l | grep -v "$CRON_SCRIPT" | crontab -
+    
+    # Create persistent notification script
+    echo '#!/bin/bash' > "$NOTIFY_SCRIPT"
+    echo 'export DISPLAY=:0' >> "$NOTIFY_SCRIPT"
+    echo '# Show desktop notification (will auto-close after 10 seconds)' >> "$NOTIFY_SCRIPT"
+    echo 'notify-send "Restart Test Completed" "Successfully completed $MAX_RESTARTS reboots!" -i dialog-information -t 10000' >> "$NOTIFY_SCRIPT"
+    echo '# Show persistent dialog that stays until manually closed' >> "$NOTIFY_SCRIPT"
+    echo 'zenity --info --text="Restart test completed after $MAX_RESTARTS reboots.\n\nClick OK to close this notification." --title="Test Completed" --width=400 --height=200' >> "$NOTIFY_SCRIPT"
+    echo '# Clean up only the autostart entry (keep notification script)' >> "$NOTIFY_SCRIPT"
+    echo 'rm -f ~/.config/autostart/restart_notifier.desktop' >> "$NOTIFY_SCRIPT"
+    chmod +x "$NOTIFY_SCRIPT"
+    
+    # Add to autostart
+    mkdir -p ~/.config/autostart
+    echo "[Desktop Entry]
+Type=Application
+Exec=$NOTIFY_SCRIPT
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name[en_US]=Restart Test Notifier
+Name=Restart Test Notifier
+Comment[en_US]=Notify restart test completion
+Comment=Notify restart test completion" > ~/.config/autostart/restart_notifier.desktop
+
+    
     exit 0
 fi
 
@@ -627,7 +681,6 @@ if ! crontab -l | grep -q "$CRON_SCRIPT"; then
 fi
 
 sleep 10
-
 echo "Restarting now..." | sudo tee /dev/kmsg
 sudo /sbin/reboot
 """
@@ -640,6 +693,8 @@ sudo /sbin/reboot
 def start_restart_test(restart_count, output_text):
     try:
         count = int(restart_count)
+        if count < 1:
+            raise ValueError("Restart count must be at least 1")
         script_path = create_restart_script()
 
         counter_file = os.path.join(os.path.expanduser("~"), "restart_count.txt")
@@ -649,10 +704,9 @@ def start_restart_test(restart_count, output_text):
         cron_cmd = f"@reboot /bin/bash {script_path} {count}"
 
         try:
-            current_cron = subprocess.check_output(["crontab", "-l"], 
-                                                 stderr=subprocess.DEVNULL).decode()
+            current_cron = subprocess.check_output(["crontab", "-l"], stderr=subprocess.DEVNULL).decode()
         except subprocess.CalledProcessError:
-            current_cron = ""  
+            current_cron = ""
         
         if cron_cmd not in current_cron:
             with tempfile.NamedTemporaryFile(mode="w+") as tmp:
@@ -662,21 +716,18 @@ def start_restart_test(restart_count, output_text):
                 tmp.flush()
                 subprocess.run(["crontab", tmp.name], check=True)
 
-        output_text.insert(tk.END, "The first restart will begin in 10 seconds.婵?..\n", "info")
+        output_text.insert(tk.END, "The first restart will begin in 10 seconds...\n", "info")
         output_text.see(tk.END)
         output_text.update()
 
         time.sleep(10)
-        subprocess.Popen(
-            ["sudo", "/sbin/reboot"],
-            start_new_session=True
-        )
+        subprocess.Popen(["sudo", "/sbin/reboot"], start_new_session=True)
         
         output_text.insert(tk.END, "The reboot sequence has been initiated....\n", "success")
-        output_text.see(tk.END)
     except Exception as e:
         output_text.insert(tk.END, f"false: {str(e)}\n", "error")
         traceback.print_exc()
+
 def stop_restart_test(output_text):
     try:
         home_dir = os.path.expanduser("~")
@@ -704,6 +755,7 @@ def stop_restart_test(output_text):
         output_text.insert(tk.END, "Restart task fully stopped\n", "success")
     except Exception as e:
         output_text.insert(tk.END, f"Stop failed: {str(e)}\n", "error")
+
         
 
 def run_all_tests(output_text, progress_bar, run_button):
@@ -714,14 +766,13 @@ def run_all_tests(output_text, progress_bar, run_button):
    
     stop_event = threading.Event()
     
-    
     test_cases = [
         ("Keyboard Detection", lambda: run_key_board(output_text)),
         ("Screen RGB Detection", lambda: run_screen_rgb(output_text)),
         ("Electricity Power Detection", lambda: run_electricity_power(output_text)),
         ("Flow Light Test", lambda: run_flow_light(output_text)),
-        ("Media Recording Test", lambda: run_media_recording(stop_event, output_text)),
-#        ("Camera Test", lambda: run_camera(stop_event, output_text)),
+#        ("Media Recording Test", lambda: run_media_recording(stop_event, output_text)),
+        ("Camera Test", lambda: run_camera(stop_event, output_text)),
 #        ("Audio Test", lambda: run_recording_playback(stop_event, output_text)),
     ]
     
@@ -752,8 +803,12 @@ def run_all_tests(output_text, progress_bar, run_button):
         try:
             result = test_func()
             results.append((name, result))
-            
-          
+
+            if name == "Camera Test":
+
+                output_text.insert(tk.END, "Waiting for Camera Test to complete...\n", "info")
+                output_text.update_idletasks()
+                            
             if "____NO" in result:
                 output_text.insert(tk.END, f"! Test failed, stopping further tests\n", "error")
                 stop_event.set()
@@ -803,6 +858,7 @@ def cleanup_and_exit(root):
         os.path.join(home_dir, 'Desktop', 'Argon_Test_Toolkit_One.desktop'),
         os.path.join(home_dir, 'restart_test.sh'),
         os.path.join(home_dir, 'restart_count.txt'),
+        os.path.join(home_dir, 'Videos/Webcam'),
         os.path.join(home_dir, 'TemperatureTests')
     ]
     
@@ -839,13 +895,11 @@ def cleanup_and_exit(root):
     root.destroy()
     
 def create_gui():
-    """Create the main GUI for the Argon One Test Toolkit"""
     root = tk.Tk()
     root.title("Argon One Test Toolkit")
     root.geometry("1280x960")
     root.resizable(True, True)
     
-    # Set application icon (if available)
     try:
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "argon-icon.png")
         if os.path.exists(icon_path):
@@ -853,7 +907,6 @@ def create_gui():
     except:
         pass
     
-    # Create style
     style = ttk.Style()
     style.configure("TButton", padding=6, font=('Helvetica', 10))
     style.configure("Big.TButton", font=('Helvetica', 12, 'bold'), padding=10)
@@ -861,27 +914,21 @@ def create_gui():
     style.configure("Info.TLabel", font=('Helvetica', 10))
     style.configure("Cleanup.TButton", background="#ffcccc", foreground="#990000")
     
-    # Main container frame
     main_frame = ttk.Frame(root)
     main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
     
-    # Header frame
     header_frame = ttk.Frame(main_frame)
     header_frame.pack(fill=tk.X, pady=(0, 10))
     
-    # Title
     title_label = ttk.Label(header_frame, text="Argon One Test Toolkit", style="Title.TLabel")
     title_label.pack(side=tk.LEFT)
     
-    # Version info
     version_label = ttk.Label(header_frame, text="v1.0", style="Info.TLabel")
     version_label.pack(side=tk.RIGHT)
     
-    # Create button frame
     button_container = ttk.Frame(main_frame)
     button_container.pack(fill=tk.X, pady=(0, 10))
     
-    # Run All Tests button (full width)
     run_all_frame = ttk.Frame(button_container)
     run_all_frame.pack(fill=tk.X, pady=(0, 10))
     
@@ -896,8 +943,6 @@ def create_gui():
     )
     run_all_button.pack(fill=tk.X, expand=True)
 
- 
-    # Full Load Test button (full width)
     full_load_frame = ttk.Frame(button_container)
     full_load_frame.pack(fill=tk.X, pady=(0, 10))
     
@@ -910,17 +955,11 @@ def create_gui():
             args=(output_text, progress_bar, full_load_button), 
             daemon=True).start()
     )
-    full_load_button.pack(fill=tk.X, expand=True) 
+    full_load_button.pack(fill=tk.X, expand=True)
     
-    # Other test buttons in a grid
-    test_buttons_frame = ttk.Frame(button_container)
-    test_buttons_frame.pack(fill=tk.X)
-
-# Create restart test frame - above the button container
     restart_frame = ttk.LabelFrame(main_frame, text="Restart Test")
     restart_frame.pack(fill=tk.X, pady=(0, 10))
     
-    # Restart test controls
     ttk.Label(restart_frame, text="Restart Count:").pack(side=tk.LEFT, padx=(10, 5))
     
     restart_var = tk.StringVar(value="5")
@@ -954,18 +993,16 @@ def create_gui():
         ).start()
     )
     stop_button.pack(side=tk.LEFT, padx=5)
-    
-    # Add note for restart test
+        
     ttk.Label(
         restart_frame,
-        text="Note: This operation will set the system to automatically reboot multiple times, please save all work!",
+        text="Note: This will reboot the system multiple times, save all work!",
         foreground="red"
     ).pack(side=tk.LEFT, padx=10)
     
-    # Create button container frame - now below the restart test
-    button_container = ttk.Frame(main_frame)
-    button_container.pack(fill=tk.X, pady=(0, 10))        
-    
+    test_buttons_frame = ttk.Frame(button_container)
+    test_buttons_frame.pack(fill=tk.X)
+
     test_buttons = [
         ("Keyboard Test", lambda: threading.Thread(target=run_key_board, args=(output_text,), daemon=True).start()),
         ("Screen RGB Test", lambda: threading.Thread(target=run_screen_rgb, args=(output_text,), daemon=True).start()),
@@ -975,7 +1012,6 @@ def create_gui():
         ("Flow Light Test", lambda: threading.Thread(target=run_flow_light, args=(output_text,), daemon=True).start()),
     ]
     
-# Create buttons in a 3-column grid
     for i, (text, command) in enumerate(test_buttons):
         row = i // 3
         col = i % 3
@@ -983,28 +1019,24 @@ def create_gui():
         btn.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
         test_buttons_frame.columnconfigure(col, weight=1)
     
-    # Progress bar
     progress_frame = ttk.Frame(main_frame)
     progress_frame.pack(fill=tk.X, pady=(0, 10))
     
     progress_bar = ttk.Progressbar(progress_frame, orient=tk.HORIZONTAL, mode='determinate')
     progress_bar.pack(fill=tk.X)
     
-    # Output text area
     output_frame = ttk.Frame(main_frame)
     output_frame.pack(fill=tk.BOTH, expand=True)
     
     output_text = scrolledtext.ScrolledText(output_frame, wrap=tk.WORD, font=('Courier', 10))
     output_text.pack(fill=tk.BOTH, expand=True)
     
-    # Configure text tags
     output_text.tag_configure("info", foreground="blue")
     output_text.tag_configure("success", foreground="green")
     output_text.tag_configure("warning", foreground="orange")
     output_text.tag_configure("error", foreground="red")
     output_text.tag_configure("bold", font=('Courier', 10, 'bold'))
     
-    # Bottom buttons frame
     bottom_frame = ttk.Frame(main_frame)
     bottom_frame.pack(fill=tk.X, pady=(10, 0))
     
@@ -1019,27 +1051,25 @@ def create_gui():
     exit_button = ttk.Button(bottom_frame, text="Exit", command=root.destroy)
     exit_button.pack(side=tk.RIGHT)
     
-    # Initial message
     output_text.insert(tk.END, "Argon One Test Toolkit v1.0\n", "bold")
-    output_text.insert(tk.END, "Ready to run tests. Select a test from the buttons above.\n\n")
+    output_text.insert(tk.END, "Ready to run tests. Select a test above.\n\n")
     
     output_text.insert(tk.END, "Full-load Test Instructions:\n", "bold")
-    output_text.insert(tk.END, "1. This test will install stress and stressberry if not already installed\n")
-    output_text.insert(tk.END, "2. It will create a directory ~/TemperatureTests\n")
-    output_text.insert(tk.END, "3. Run a 30-minute full load test on 4 cores\n")
-    output_text.insert(tk.END, "4. Generate a temperature graph after completion\n")
-    output_text.insert(tk.END, "Note: This test will take approximately 30 minutes to complete\n\n")    
+    output_text.insert(tk.END, "1. Installs stress and stressberry if needed\n")
+    output_text.insert(tk.END, "2. Creates ~/TemperatureTests directory\n")
+    output_text.insert(tk.END, "3. Runs a 30-minute full load test on 4 cores\n")
+    output_text.insert(tk.END, "4. Generates a temperature graph\n")
+    output_text.insert(tk.END, "Note: Takes ~30 minutes\n\n")
     
-    # Check dependencies
     deps_ok, missing = check_dependencies()
     if not deps_ok:
-        output_text.insert(tk.END, "Warning: Missing dependencies detected!\n", "warning")
-        output_text.insert(tk.END, "Some tests may not work properly. Missing:\n", "warning")
+        output_text.insert(tk.END, "Warning: Missing dependencies!\n", "warning")
+        output_text.insert(tk.END, "Some tests may fail. Missing:\n", "warning")
         for dep in missing:
             output_text.insert(tk.END, f"  - {dep}\n", "warning")
         output_text.insert(tk.END, "\n")
     
-    return root
+    return root        
 
 
 
