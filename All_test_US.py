@@ -60,10 +60,15 @@ def check_dependencies():
         subprocess.run(["which", "ddcutil"], check=True, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         missing.append("ddcutil (install with: sudo apt install -y ddcutil)")
+    
     try:
         subprocess.run(["which", "cheese"], check=True, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
-        missing.append("cheese (install with: sudo apt install -y cheese)")        
+        try:
+            subprocess.run(["sudo", "apt", "install", "-y", "cheese"], 
+                         check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError:
+            missing.append("cheese (install with: sudo apt install -y cheese)")
         
     if missing:
         return False, missing
