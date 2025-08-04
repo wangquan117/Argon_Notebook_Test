@@ -8,12 +8,19 @@ mkdir  -p ${dir}
 echo cd ${dir}
 cd  ${dir}
 
+# 自动检测设备类型并设置分区后缀
+if [[ $sd == *"nvme"* ]]; then
+    suffix="p"
+else
+    suffix=""
+fi
+
 #mount sd card
 echo mkdir src_boot src_root
 mkdir -p src_boot src_root
-echo mount ${sd}1 ${sd}2
-mount -t vfat -o umask=0000  ${sd}1 ./src_boot/
-mount -t ext4 ${sd}2 ./src_root/
+echo mount ${sd}${suffix}1 ${sd}${suffix}2
+mount -t vfat -o umask=0000 ${sd}${suffix}1 ./src_boot/
+mount -t ext4 ${sd}${suffix}2 ./src_root/
 
 isosize=`df -B 1M | grep ${sd} | awk '{ sum+=$3};END {print sum}'`
 isosize=$((isosize+isosize/5))
@@ -24,7 +31,6 @@ dd if=/dev/zero of=${dir}.img bs=1M count=${isosize}
 parted ${dir}.img --script -- mklabel msdos
 parted ${dir}.img --script -- mkpart primary fat32 8192s 122479s
 parted ${dir}.img --script -- mkpart primary ext4 122880s -1
-
 
 loopdevice=`sudo losetup -f --show ${dir}.img`
 r=`kpartx -sva ${loopdevice} | awk '{print $3}'`
