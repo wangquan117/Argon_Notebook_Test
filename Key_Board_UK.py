@@ -55,37 +55,22 @@ keyboard_layout = [
      {"key": "insert", "label": "Insert", "symbol": "", "rect": pygame.Rect(1220, 100, 70, 40)},
      {"key": "delete", "label": "Delete", "symbol": "", "rect": pygame.Rect(1300, 100, 70, 40)}],
     
-   
-    [{"key": "¬", "label": "¬", "symbol": "", "rect": pygame.Rect(20, 150, 50, 30)},
-     {"key": "!", "label": "!", "symbol": "", "rect": pygame.Rect(80, 150, 50, 30)},
-     {"key": '"', "label": '"', "symbol": "", "rect": pygame.Rect(140, 150, 50, 30)},
-     {"key": "£", "label": "£", "symbol": "", "rect": pygame.Rect(200, 150, 50, 30)},
-     {"key": "$", "label": "$", "symbol": "", "rect": pygame.Rect(260, 150, 50, 30)},
-     {"key": "%", "label": "%", "symbol": "", "rect": pygame.Rect(320, 150, 50, 30)},
-     {"key": "^", "label": "^", "symbol": "", "rect": pygame.Rect(380, 150, 50, 30)},
-     {"key": "&", "label": "&", "symbol": "", "rect": pygame.Rect(440, 150, 50, 30)},
-     {"key": "*", "label": "*", "symbol": "", "rect": pygame.Rect(500, 150, 50, 30)},
-     {"key": "(", "label": "(", "symbol": "", "rect": pygame.Rect(560, 150, 50, 30)},
-     {"key": ")", "label": ")", "symbol": "", "rect": pygame.Rect(620, 150, 50, 30)},
-     {"key": "_", "label": "_", "symbol": "", "rect": pygame.Rect(680, 150, 50, 30)},
-     {"key": "+", "label": "+", "symbol": "", "rect": pygame.Rect(740, 150, 50, 30)},],
-    
 
-    [{"key": "`", "label": "`", "symbol": "~", "rect": pygame.Rect(20, 190, 50, 40)},
-     {"key": "1", "label": "1", "symbol": "!", "rect": pygame.Rect(80, 190, 50, 40)},
-     {"key": "2", "label": "2", "symbol": "@", "rect": pygame.Rect(140, 190, 50, 40)},
-     {"key": "3", "label": "3", "symbol": "#", "rect": pygame.Rect(200, 190, 50, 40)},
-     {"key": "4", "label": "4", "symbol": "$", "rect": pygame.Rect(260, 190, 50, 40)},
-     {"key": "5", "label": "5", "symbol": "%", "rect": pygame.Rect(320, 190, 50, 40)},
-     {"key": "6", "label": "6", "symbol": "^", "rect": pygame.Rect(380, 190, 50, 40)},
-     {"key": "7", "label": "7", "symbol": "&", "rect": pygame.Rect(440, 190, 50, 40)},
-     {"key": "8", "label": "8", "symbol": "*", "rect": pygame.Rect(500, 190, 50, 40)},
-     {"key": "9", "label": "9", "symbol": "(", "rect": pygame.Rect(560, 190, 50, 40)},
-     {"key": "0", "label": "0", "symbol": ")", "rect": pygame.Rect(620, 190, 50, 40)},
-     {"key": "-", "label": "-", "symbol": "_", "rect": pygame.Rect(680, 190, 50, 40)},
-     {"key": "=", "label": "=", "symbol": "+", "rect": pygame.Rect(740, 190, 50, 40)},
-     {"key": "backspace", "label": "Backspace", "symbol": "", "rect": pygame.Rect(800, 190, 100, 40)},
-     {"key": "home", "label": "Home", "symbol": "", "rect": pygame.Rect(960, 190, 50, 40)}],
+    [{"key": "`", "label": "`", "symbol": "~", "rect": pygame.Rect(20, 150, 50, 40)},
+     {"key": "1", "label": "1", "symbol": "!", "rect": pygame.Rect(80, 150, 50, 40)},
+     {"key": "2", "label": "2", "symbol": "@", "rect": pygame.Rect(140, 150, 50, 40)},
+     {"key": "3", "label": "3", "symbol": "#", "rect": pygame.Rect(200, 150, 50, 40)},
+     {"key": "4", "label": "4", "symbol": "$", "rect": pygame.Rect(260, 150, 50, 40)},
+     {"key": "5", "label": "5", "symbol": "%", "rect": pygame.Rect(320, 150, 50, 40)},
+     {"key": "6", "label": "6", "symbol": "^", "rect": pygame.Rect(380, 150, 50, 40)},
+     {"key": "7", "label": "7", "symbol": "&", "rect": pygame.Rect(440, 150, 50, 40)},
+     {"key": "8", "label": "8", "symbol": "*", "rect": pygame.Rect(500, 150, 50, 40)},
+     {"key": "9", "label": "9", "symbol": "(", "rect": pygame.Rect(560, 150, 50, 40)},
+     {"key": "0", "label": "0", "symbol": ")", "rect": pygame.Rect(620, 150, 50, 40)},
+     {"key": "-", "label": "-", "symbol": "_", "rect": pygame.Rect(680, 150, 50, 40)},
+     {"key": "=", "label": "=", "symbol": "+", "rect": pygame.Rect(740, 150, 50, 40)},
+     {"key": "backspace", "label": "Backspace", "symbol": "", "rect": pygame.Rect(800, 150, 100, 40)},
+     {"key": "home", "label": "Home", "symbol": "", "rect": pygame.Rect(960, 150, 50, 40)}],
      
 
     [{"key": "tab", "label": "Tab", "symbol": "", "rect": pygame.Rect(20, 240, 70, 40)},
@@ -144,13 +129,14 @@ keyboard_layout = [
      {"key": "lalt", "label": "Alt", "symbol": "", "rect": pygame.Rect(260, 390, 70, 40)},
      {"key": "space", "label": "Space", "symbol": "", "rect": pygame.Rect(340, 390, 300, 40)},
      {"key": "ralt", "label": "Alt", "symbol": "", "rect": pygame.Rect(650, 390, 70, 40)},
-     {"key": "rctrl", "label": "Ctrl", "symbol": "", "rect": pygame.Rect(730, 390, 70, 40)},
-     {"key": "left", "label": "left", "symbol": "", "rect": pygame.Rect(820, 390, 50, 40)},
-     {"key": "up", "label": "up", "symbol": "", "rect": pygame.Rect(880, 390, 50, 40)},
-     {"key": "down", "label": "down", "symbol": "", "rect": pygame.Rect(880, 440, 50, 40)}],
+     {"key": "compose", "label": "Compose", "symbol": "", "rect": pygame.Rect(730, 390, 70, 40)},
+     {"key": "rctrl", "label": "Ctrl", "symbol": "", "rect": pygame.Rect(820, 390, 70, 40)},
+     {"key": "left", "label": "left", "symbol": "", "rect": pygame.Rect(900, 390, 50, 40)},
+     {"key": "up", "label": "up", "symbol": "", "rect": pygame.Rect(940, 390, 50, 40)},
+     {"key": "down", "label": "down", "symbol": "", "rect": pygame.Rect(940, 440, 50, 40)}],
 
 
-    [{"key": "right", "label": "right", "symbol": "", "rect": pygame.Rect(940, 390, 50, 40)}]
+    [{"key": "right", "label": "right", "symbol": "", "rect": pygame.Rect(1000, 390, 50, 40)}]
 ]     
      
 
@@ -215,17 +201,17 @@ special_key_mapping = {
     pygame.K_PAGEUP: "pgup",
     pygame.K_PAGEDOWN: "pgdn",
  
-    #pygame.K_COMPOSE: "compose"
-#    127: "compose"
+#    pygame.K_COMPOSE: "Com"
+#    127: "Com"
 }
 
 
 shift_special_mapping = {
-    pygame.K_BACKQUOTE: "¬",
+    pygame.K_BACKQUOTE: "卢",
     pygame.K_0: ")",
     pygame.K_1: "!",
     pygame.K_2: '"',
-    pygame.K_3: "£",
+    pygame.K_3: "拢",
     pygame.K_4: "$",
     pygame.K_5: "%",
     pygame.K_6: "^",
@@ -398,7 +384,6 @@ def keyboard_test_screen():
                     ctrl_pressed = False
                 if event.key in [pygame.K_LALT, pygame.K_RALT]:
                     alt_pressed = False
-                
                 mods = pygame.key.get_mods()
                 shift_pressed = bool(mods & pygame.KMOD_SHIFT)
                 
@@ -485,7 +470,7 @@ def keyboard_test_screen():
  
     device_main.ungrab()
     device_fn.ungrab()
-    return                                                                             
+    return                                                                                                                                                                                                  
 
 def main():
     clock = pygame.time.Clock()
