@@ -62,17 +62,19 @@ def check_dependencies():
         missing.append("ddcutil (install with: sudo apt install -y ddcutil)")
     
     try:
-        subprocess.run(["which", "cheese"], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["which", "guvcview"], check=True, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         try:
-            subprocess.run(["sudo", "apt", "install", "-y", "cheese"], 
+            subprocess.run(["sudo", "apt", "install", "-y", "guvcview"], 
                          check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
-            missing.append("cheese (install with: sudo apt install -y cheese)")
+            missing.append("guvcview (install with: sudo apt install -y guvcview)")
         
     if missing:
         return False, missing
     return True, []
+    
+
     
 
 def run_media_recording(stop_event, output_text):
@@ -237,7 +239,7 @@ def run_camera(stop_event, output_text):
         output_text.update()
 
         cheese_process = subprocess.Popen(
-            ["cheese"],
+            ["guvcview"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True
@@ -252,12 +254,6 @@ def run_camera(stop_event, output_text):
                 output_text.insert(tk.END, "Camera test interrupted by user.\n", "warning")
                 return "run_camera____INTERRUPTED"
 
-#            line = cheese_process.stdout.readline()
-#            if line:
-#                output_text.insert(tk.END, line)
-#                output_text.see(tk.END)
-#                output_text.update()
-#            time.sleep(0.1)  
 
         if cheese_process.returncode == 0:
             output_text.insert(tk.END, "Camera test completed successfully!\n", "success")
@@ -839,6 +835,8 @@ def cleanup_and_exit(root):
         os.path.join(home_dir, 'show_notification.sh'),
         os.path.join(home_dir, 'Videos/Webcam'),
         os.path.join(home_dir, 'Desktop', 'music_e.mp3'),
+        os.path.join(home_dir, 'Desktop', 'my_video-1.mkv'),
+        os.path.join(home_dir, 'Desktop', 'my_video-2.mkv'),
         os.path.join(home_dir, 'TemperatureTests')
     ]
   
