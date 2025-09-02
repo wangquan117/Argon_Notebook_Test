@@ -670,8 +670,47 @@ def start_restart_test(restart_count, output_text):
         count = int(restart_count)
         if count < 1:
             raise ValueError("Restart count must be at least 1")
-        script_path = create_restart_script()
 
+        services_to_disable = [
+            "bluetooth.service",
+            "cups-browsed.service",
+            "cups.service",
+            "ModemManager.service",
+            "apt-daily.service",
+            "apt-daily-upgrade.service",
+            "dphys-swapfile.service"
+        ]
+        
+        output_text.insert(tk.END, "Disabling system services...\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+        
+        for service in services_to_disable:
+            try:
+                result = subprocess.run(
+                    ["sudo", "systemctl", "disable", service],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                if result.returncode == 0:
+                    output_text.insert(tk.END, f"Disabled {service}\n", "success")
+                else:
+
+                    if "not found" in result.stderr.lower():
+                        output_text.insert(tk.END, f"Service {service} not found (may be normal)\n", "warning")
+                    else:
+                        output_text.insert(tk.END, f"Failed to disable {service}: {result.stderr}\n", "warning")
+            except subprocess.TimeoutExpired:
+                output_text.insert(tk.END, f"Timeout disabling {service}\n", "warning")
+            except Exception as e:
+                output_text.insert(tk.END, f"Error disabling {service}: {str(e)}\n", "warning")
+        
+        output_text.insert(tk.END, "Service disabling completed\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+
+        script_path = create_restart_script()
         counter_file = os.path.join(os.path.expanduser("~"), "restart_count.txt")
         with open(counter_file, "w") as f:
             f.write("0")
@@ -701,7 +740,7 @@ def start_restart_test(restart_count, output_text):
         output_text.insert(tk.END, "The reboot sequence has been initiated....\n", "success")
     except Exception as e:
         output_text.insert(tk.END, f"false: {str(e)}\n", "error")
-        traceback.print_exc()
+        traceback.print_exc()        
 
 def stop_restart_test(output_text):
     try:
