@@ -13,7 +13,7 @@ WIDTH, HEIGHT = 1680, 960
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Argon ONE UP Keyboard Tester")
 
-
+font_chinese = pygame.font.SysFont("WenQuanYi Zen Hei", 30)
 device_main = InputDevice('/dev/input/event9')  
 device_fn = InputDevice('/dev/input/event13')   
 
@@ -257,24 +257,27 @@ def draw_keyboard(pressed_keys, highlighted_keys, pressed_history, caps_lock_on)
     screen.fill(BACKGROUND)
     title_surf = font_large.render("Argon ONE UP Keyboard Tester", True, TEXT_COLOR)
     screen.blit(title_surf, (WIDTH//2 - title_surf.get_width()//2, 20))
-
     pygame.draw.rect(screen, PANEL_BG, TEXT_BOX, border_radius=3)
     pygame.draw.rect(screen, (60, 64, 72), TEXT_BOX, 1, border_radius=3)
-    
-    history_text = ", ".join(pressed_history[-10:])  
+  
+    history_text = ", ".join(pressed_history[-10:])
     text_surf = font_medium.render(history_text, True, TEXT_COLOR)
-    
     screen.blit(text_surf, (TEXT_BOX.x + 10, TEXT_BOX.y + (TEXT_BOX.height - text_surf.get_height()) // 2))
-
+   
     for row in keyboard_layout:
         for key in row:
             is_pressed = key["key"] in pressed_keys
             is_highlighted = key["key"] in highlighted_keys
             draw_key(key, is_pressed, caps_lock_on, is_highlighted)
-
-    footer = font_small.render("Press Ctrl+C to exit, Ctrl+Alt+Q to reset highlights", True, DISABLED_COLOR)
-    screen.blit(footer, (WIDTH//2 - footer.get_width()//2, HEIGHT - 30))
-
+#    footer = font_small.render("Press Ctrl+C to exit, Ctrl+Alt+Q to reset highlights", True, DISABLED_COLOR)
+#    screen.blit(footer, (WIDTH//2 - footer.get_width()//2, HEIGHT - 50))
+    chinese_text = "按键测试：1、（FN+F2）= FN键亮。2、按两下“树莓派图标”=树莓派图标亮。3、其他键按亮。"  
+    chinese_surf = font_chinese.render(chinese_text, True, DISABLED_COLOR)
+    screen.blit(chinese_surf, (WIDTH//2 - chinese_surf.get_width()//2, HEIGHT - 100))
+    new_chinese_text = "屏幕测试（下一环节）：需要屏幕无色差，无光斑等异常。确认没问题后，按‘ESC’按键退出"
+    new_chinese_surf = font_chinese.render(new_chinese_text, True, DISABLED_COLOR)
+    screen.blit(new_chinese_surf, (WIDTH//2 - new_chinese_surf.get_width()//2, HEIGHT - 45))
+   
     pygame.display.flip()
     
     
