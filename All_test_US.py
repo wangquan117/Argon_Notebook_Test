@@ -147,10 +147,9 @@ def run_system_update(output_text):
     except subprocess.CalledProcessError as e:
         output_text.insert(tk.END, f"System update failed: {e}\n", "error")
         return False
-
+        
 def run_key_board(output_text):
     """Run keyboard test with GUI output"""
-    messagebox.showinfo("Keyboard Test", "键盘需全部按亮")
     output_text.insert(tk.END, "\nStarting Keyboard Test...\n", "info")
     output_text.see(tk.END)
     output_text.update()
@@ -192,7 +191,7 @@ def run_key_board(output_text):
 
 def run_screen_rgb(output_text):
     """Run Screen RGB Detection with GUI output"""
-    messagebox.showinfo("Screen RGB Test", "全屏须无色差、无光斑等异常，没问题按ESC键退出")
+#    messagebox.showinfo("Screen RGB Test", "全屏须无色差、无光斑等异常，没问题按ESC键退出")
     output_text.insert(tk.END, "\nStarting Screen RGB Test...\n", "info")
     output_text.see(tk.END)
     output_text.update()
@@ -220,42 +219,100 @@ def run_screen_rgb(output_text):
         return f"run_screen_rgb____NO: {str(e)}"
 
 def run_camera(stop_event, output_text):
-    """Run camera test using Cheese"""
-    messagebox.showinfo("Camera Test", "需要正常录音、录像、播放，10S且除环境音外，无额外杂音、噪音等")
+    """Run camera test using guvcview with GUI output and non-blocking prompt"""
     try:
         if not os.path.exists("/dev/video0"):
             subprocess.run(["sudo", "modprobe", "bcm2835-v4l2"], check=False)
             time.sleep(2)
             if not os.path.exists("/dev/video0"):
                 raise Exception("/dev/video0 not found. Check camera connection and enable in raspi-config")
-        output_text.insert(tk.END, "\nStarting Camera Test with Cheese...\n", "info")
+      
+        output_text.insert(tk.END, "\nStarting Camera Test with guvcview...\n", "info")
         output_text.see(tk.END)
         output_text.update()
+        
+        # Create a non-blocking Toplevel window for the prompt
+        prompt_window = tk.Toplevel()
+        prompt_window.title("Camera Test")
+        # Set geometry to 400x400 pixels and position at top-left (0,0)
+        prompt_window.geometry("400x400+50+50")
+        prompt_window.transient(root)  # Set as transient to main window
+        prompt_window.grab_set()  # Make the prompt modal
+        # Ensure the window is placed at the top-left corner
+        prompt_window.update_idletasks()  # Update geometry before forcing position
+        prompt_window.geometry("+50+50")  # Explicitly set to top-left corner
+        tk.Label(prompt_window, text="1、点中间按键，录像10秒（工人计时）。2、点中间按键录制完成。3、点右边按键退出。4、播放视频，除环境声外，无额外杂音、噪音等", font=('Helvetica', 18),
+            wraplength=350,  # Wrap text within 350 pixels
+            justify="center"  # Center the text
+        ).pack(pady=20, padx=10)
+        prompt_window.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable closing via window manager
+        # Ensure the prompt window is on top
+        prompt_window.lift()
+        output_text.update_idletasks()
+
+        # Run the camera test with guvcview
         cheese_process = subprocess.Popen(
             ["guvcview"],
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             text=True
         )
-        output_text.insert(tk.END, "Camera test running. Close Cheese to complete test...\n", "info")
-        while True:
-            if cheese_process.poll() is not None:
-                break
-            if stop_event.is_set():
-                cheese_process.terminate()
-                output_text.insert(tk.END, "Camera test interrupted by user.\n", "warning")
-                return "run_camera____INTERRUPTED"
-        if cheese_process.returncode == 0:
-            output_text.insert(tk.END, "Camera test completed successfully!\n", "success")
-            return "run_camera____YES"
-        else:
-            output_text.insert(tk.END, f"Camera test exited with code {cheese_process.returncode}\n", "warning")
-            return f"run_camera____NO: Exit code {cheese_process.returncode}"
-    
+        output_text.insert(tk.END, "Camera test running. Close guvcview to complete test...\n", "info")
+        output_text.see(tk.END)
+        output_text.update()
+
+        # Function to monitor the process and handle stop event
+        def monitor_process():
+            try:
+                while True:
+                    if stop_event.is_set():
+                        cheese_process.terminate()
+                        try:
+                            cheese_process.wait(timeout=2)  # Give it time to terminate
+                        except subprocess.TimeoutExpired:
+                            cheese_process.kill()  # Force kill if it doesn't terminate
+                        output_text.insert(tk.END, "Camera test interrupted by user.\n", "warning")
+                        return "run_camera____INTERRUPTED"
+                  
+                    if cheese_process.poll() is not None:
+                        stdout, stderr = cheese_process.communicate()
+                        if cheese_process.returncode == 0:
+                            output_text.insert(tk.END, "Camera test completed successfully!\n", "success")
+                            return "run_camera____YES"
+                        else:
+                            output_text.insert(tk.END, f"Camera test failed with exit code: {cheese_process.returncode}\n", "error")
+                            output_text.insert(tk.END, f"stdout: {stdout}\n")
+                            output_text.insert(tk.END, f"stderr: {stderr}\n")
+                            return f"run_camera____NO: Exit code {cheese_process.returncode}"
+                    time.sleep(0.1)  # Avoid busy-waiting
+            except Exception as e:
+                output_text.insert(tk.END, f"Error in camera test: {str(e)}\n", "error")
+                return f"run_camera____NO: {str(e)}"
+            finally:
+                # Close the prompt window when the script finishes or fails
+                root.after(0, prompt_window.destroy)
+                output_text.see(tk.END)
+                output_text.update()
+        
+        # Run the monitor in a separate thread to avoid blocking the GUI
+        monitor_thread = threading.Thread(target=lambda: setattr(monitor_thread, 'result', monitor_process()), daemon=True)
+        monitor_thread.start()
+        monitor_thread.join()  # Wait for the thread to finish
+        return monitor_thread.result
     except Exception as e:
         output_text.insert(tk.END, f"Error in camera test: {str(e)}\n", "error")
+        # Ensure the prompt window is closed if an exception occurs before process starts
+        if 'prompt_window' in locals():
+            root.after(0, prompt_window.destroy)
         return f"run_camera____NO: {str(e)}"
 
+    except Exception as e:
+        output_text.insert(tk.END, f"Error in camera test: {str(e)}\n", "error")
+        # Ensure the prompt window is closed if an exception occurs before process starts
+        if 'prompt_window' in locals():
+            root.after(0, prompt_window.destroy)
+        return f"run_camera____NO: {str(e)}"
+                
 def run_electricity_power(output_text):
     """Run electricity power test with GUI output"""
     messagebox.showinfo("Electricity Power Test", "读取电量要跟桌面电量显示相同")
@@ -286,32 +343,69 @@ def run_electricity_power(output_text):
         return f"run_electricity_power____NO: {str(e)}"
 
 def run_flow_light(output_text):
-    """Run flow light test with GUI output"""
-    messagebox.showinfo("Flow Light Test", "POWER灯常亮红色，绿灯流线型亮灯")
+    """Run flow light test with GUI output and non-blocking prompt"""
     output_text.insert(tk.END, "\nStarting Flow Light Test...\n", "info")
     output_text.see(tk.END)
     output_text.update()
-    
+  
     try:
         script_path = os.path.join(TEST_SCRIPTS_DIR, "Flow_Light.py")
         if not os.path.exists(script_path):
             raise Exception(f"{script_path} not found. Please check the directory.")
-    
-        process = subprocess.Popen(["python3", script_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        for line in process.stdout:
-            output_text.insert(tk.END, line)
-            output_text.see(tk.END)
-            output_text.update()
-        process.wait()
-    
-        if process.returncode == 0:
-            output_text.insert(tk.END, "Flow light test completed successfully!\n", "success")
-            return "run_flow_light____YES"
-        else:
-            output_text.insert(tk.END, f"Flow light test failed with exit code: {process.returncode}\n", "error")
-            return f"run_flow_light____NO: Exit code {process.returncode}"
+  
+        # Create a non-blocking Toplevel window for the prompt
+        prompt_window = tk.Toplevel()
+        prompt_window.title("Flow Light Test")
+        prompt_window.geometry("400x200")
+        prompt_window.transient(root)  # Set as transient to main window
+        prompt_window.grab_set()  # Make the prompt modal
+        tk.Label(prompt_window, text="红灯常亮，绿灯流线型亮灭", font=('Helvetica', 14)).pack(pady=20)
+        prompt_window.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable closing via window manager
+        # Ensure the prompt window is on top
+        prompt_window.lift()
+        output_text.update_idletasks()
+  
+        # Run the flow light test script
+        process = subprocess.Popen(
+            ["python3", script_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+  
+        # Function to monitor the process and close the prompt when done
+        def monitor_process():
+            try:
+                stdout, stderr = process.communicate()  # Wait for the process to complete
+                if process.returncode == 0:
+                    output_text.insert(tk.END, "Flow light test completed successfully!\n", "success")
+                    result = "run_flow_light____YES"
+                else:
+                    output_text.insert(tk.END, f"Flow light test failed with exit code: {process.returncode}\n", "error")
+                    output_text.insert(tk.END, f"stdout: {stdout}\n")
+                    output_text.insert(tk.END, f"stderr: {stderr}\n")
+                    result = f"run_flow_light____NO: Exit code {process.returncode}"
+            except Exception as e:
+                output_text.insert(tk.END, f"Error running flow light test: {str(e)}\n", "error")
+                result = f"run_flow_light____NO: {str(e)}"
+            finally:
+                # Close the prompt window when the script finishes or fails
+                root.after(0, prompt_window.destroy)
+                output_text.see(tk.END)
+                output_text.update()
+            return result
+  
+        # Run the monitor in a separate thread to avoid blocking the GUI
+        monitor_thread = threading.Thread(target=lambda: setattr(monitor_thread, 'result', monitor_process()), daemon=True)
+        monitor_thread.start()
+        monitor_thread.join()  # Wait for the thread to finish
+        return monitor_thread.result
+  
     except Exception as e:
         output_text.insert(tk.END, f"Error running flow light test: {str(e)}\n", "error")
+        # Ensure the prompt window is closed if an exception occurs before process starts
+        if 'prompt_window' in locals():
+            root.after(0, prompt_window.destroy)
         return f"run_flow_light____NO: {str(e)}"
 
 def run_full_load_test(output_text, progress_bar, run_button):
@@ -644,9 +738,9 @@ def run_all_tests(output_text, progress_bar, run_button):
     test_cases = [
         ("Keyboard Detection", lambda: run_key_board(output_text)),
         ("Screen RGB Detection", lambda: run_screen_rgb(output_text)),
-        ("Electricity Power Detection", lambda: run_electricity_power(output_text)),
+#        ("Electricity Power Detection", lambda: run_electricity_power(output_text)),
         ("Flow Light Test", lambda: run_flow_light(output_text)),
- #       ("Media Recording Test", lambda: run_media_recording(stop_event, output_text)),
+#        ("Media Recording Test", lambda: run_media_recording(stop_event, output_text)),
         ("Camera Test", lambda: run_camera(stop_event, output_text)),
     ]
     
@@ -728,6 +822,7 @@ def cleanup_and_exit(root):
         os.path.join(home_dir, 'Desktop', 'music_e.mp3'),
         os.path.join(home_dir, 'Desktop', 'my_video-1.mkv'),
         os.path.join(home_dir, 'Desktop', 'my_video-2.mkv'),
+        os.path.join(home_dir, 'Desktop', 'my_video-3.mkv'),
         os.path.join(home_dir, 'TemperatureTests')
     ]
     removed = []
@@ -971,13 +1066,13 @@ def create_gui():
 一、笔记本全测标准
 1) 键盘测试：软件笔记本运行模拟键盘需全部按亮。
 2) 屏幕色差：软件笔记本运行RGB颜色须覆盖全屏幕无色差、无光斑等异常。
-3) 电量读取：软件笔记本运行读取电量要跟桌面电量显示相同。
-4) 自定义双USB+扩展板：软件笔记本运行测试"GPIO测试板"流水灯，红灯一直亮、绿灯流线型亮灯。
-5) 摄像头+录音+麦克风：软件笔记本运行录制视频功能，须要正常录音、录像、播放，10S且除环境音外，无额外杂音、噪音等。
-6) 屏幕损坏：按键触发屏幕亮度，屏幕损坏有明显变色，且屏幕右上角有提示修改。
-7) 老化测试：软件笔记本运行老化测试结束后，显示的图表中温度不能超过60℃，且在指定区间内无法动态一直保持在2400MHz。
-8) 音量调节：按键触发笔记本的音量，有明显变色且右上角图标有跟随变化。
-9) 笔记本两端的接口：要能正常识别、打开使用。
+3) 自定义双USB+扩展板：软件笔记本运行测试"GPIO测试板"流水灯，红灯一直亮、绿灯流线型亮灯。
+4) 摄像头+录音+麦克风：软件笔记本运行录制视频功能，须要正常录音、录像、播放，10S且除环境音外，无额外杂音、噪音等。
+5) 屏幕亮度：按键触发屏幕亮度，屏幕亮度有明显亮暗，且屏幕右上角有提示修改。
+6) 老化测试：软件笔记本运行老化测试结束后，显示的图表中温度不能超过60℃，且在指定区间内无法动态一直保持在2400MHz。
+7) 音量调节：按键触发笔记本的音量，有明显变色且右上角图标有跟随变化。
+8) 笔记本两端的接口：要能正常识别、打开使用。
+9） 键盘底光：按‘FN+空格’可以控制键盘底光亮灭。
 10) 删除测试笔记本和数据（三点科技做的）：软件笔记本一键删除测试文件，保留显示电量图标，无额外多余测试文件。
 其他测试：笔记本厂家通用测试。
 """
@@ -1010,4 +1105,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
     
