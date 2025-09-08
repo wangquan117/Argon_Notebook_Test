@@ -642,13 +642,13 @@ def start_restart_test(restart_count, output_text):
         if count < 1:
             raise ValueError("Restart count must be at least 1")
         services_to_disable = [
-            "bluetooth.service",
-            "cups-browsed.service",
-            "cups.service",
-            "ModemManager.service",
-            "apt-daily.service",
-            "apt-daily-upgrade.service",
-            "dphys-swapfile.service"
+            "hailort.service",
+            "avahi-daemon.service",
+            "wayvnc.service",
+            "NetworkManager-wait-online.service",
+            "alsa-restore.service",
+            "rpi-eeprom-update.service",
+            "packagekit.service"
         ]
         
         output_text.insert(tk.END, "Disabling system services...\n", "info")
