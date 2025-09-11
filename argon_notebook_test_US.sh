@@ -54,6 +54,12 @@ sudo apt-get install libjpeg62-turbo-dev -y || {
     exit 1
 }
 
+# Install Chinese font support
+echo "Installing Chinese font support..."
+sudo apt install -y fonts-wqy-zenhei || {
+    echo "Failed to install Chinese font package. Some Chinese characters may not display properly." >&2
+}
+
 # Upgrade Pillow with system package compatibility
 echo "Upgrading Pillow library..."
 pip3 install --upgrade Pillow --break-system-packages || {
