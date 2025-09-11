@@ -2,7 +2,7 @@ import RPi.GPIO as GPIO
 import time
 
 
-led_pins = [i for i in range(28)] 
+led_pins = [i for i in range(27)] 
 
 
 GPIO.setmode(GPIO.BCM)
