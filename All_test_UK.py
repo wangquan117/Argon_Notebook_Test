@@ -643,7 +643,6 @@ def start_restart_test(restart_count, output_text):
         if count < 1:
             raise ValueError("Restart count must be at least 1")
         services_to_disable = [
-            "hailort.service",
             "avahi-daemon.service",
             "wayvnc.service",
             "NetworkManager-wait-online.service",
