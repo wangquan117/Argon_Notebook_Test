@@ -76,50 +76,106 @@ def check_dependencies():
     return True, []
 
 def run_media_recording(stop_event, output_text):
-    """Run media recording test with GUI output"""
-    messagebox.showinfo("Media Recording Test", "需要正常录音、录像、播放，且除环境音外，无额外杂音、噪音等。")
-    output_text.insert(tk.END, "\nStarting media recording (audio and video) for 6 seconds...\n", "info")
-    output_text.see(tk.END)
-    output_text.update()
-    
-    try:
-        display = os.environ.get('DISPLAY')
-        if not display:
-            raise Exception("No display available (DISPLAY not set). Set it with: export DISPLAY=:0")
-        if not os.path.exists("/dev/video0"):
-            raise Exception("/dev/video0 not found. Check camera connection or load v4l2loopback.")
-        output_text.insert(tk.END, f"Using display: {display}\n", "info")
-        output_file = "recorded_media.mp4"
-        if os.path.exists(output_file):
-            os.remove(output_file)
-        # Record audio and video for 6 seconds
-        ffmpeg_process = subprocess.Popen(
-            ["ffmpeg", "-y", "-f", "v4l2", "-i", "/dev/video0", "-f", "alsa", "-i", "default", "-t", "12", output_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
-        )
-        ffmpeg_process.wait()
-        output_text.insert(tk.END, "\nRecording completed. Starting playback...\n", "info")
+   """Run media recording test with GUI output"""
+   try:
+        # Create a non-blocking Toplevel window for the prompt
+        prompt_window = tk.Toplevel()
+        prompt_window.title("录音测试")
+        # Set geometry and position
+        prompt_window.geometry("500x300+100+100")
+        prompt_window.transient(root)  # Set as transient to main window
+        prompt_window.grab_set()  # Make the prompt modal
+        prompt_window.update_idletasks()
+        prompt_window.geometry("+100+100")  # Explicitly set position
+        
+        # Add prompt message
+        tk.Label(prompt_window, 
+                text="目前正在录音10秒，录音结束会自动播放录音内容，要求：正常录音及播放，播放内容除去环境声外，无额外杂音，噪音等",
+                font=('Helvetica', 14),
+                wraplength=450,  # Wrap text within 450 pixels
+                justify="center"  # Center the text
+        ).pack(pady=30, padx=20)
+        
+        prompt_window.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable closing via window manager
+        prompt_window.lift()  # Ensure the prompt window is on top
+        output_text.update_idletasks()
+
+        output_text.insert(tk.END, "\nStarting media recording (audio and video) for 6 seconds...\n", "info")
         output_text.see(tk.END)
         output_text.update()
-    
-        # Playback the recorded video
-        ffplay_process = subprocess.Popen(
-            ["ffplay", "-autoexit", output_file],
+        
+        output_file = "recorded_audio.wav"  
+        if os.path.exists(output_file):
+            os.remove(output_file)
+
+        # Run ffmpeg recording process
+        ffmpeg_process = subprocess.Popen(
+            ["ffmpeg", "-y", "-f", "alsa", "-i", "default", "-t", "6", output_file],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             close_fds=True
         )
-        ffplay_process.wait()
-    
-        output_text.insert(tk.END, "Media test completed successfully!\n", "success")
-        return "run_media_recording____YES"
-    except Exception as e:
+        # Function to monitor the process and handle stop event
+        def monitor_process():
+            try:
+                while True:
+                    if stop_event.is_set():
+                        ffmpeg_process.terminate()
+                        try:
+                            ffmpeg_process.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            ffmpeg_process.kill()
+                        output_text.insert(tk.END, "Audio recording interrupted by user.\n", "warning")
+                        return "run_audio_recording____INTERRUPTED"
+                  
+                    if ffmpeg_process.poll() is not None:
+                        # Recording completed, now play back
+                        output_text.insert(tk.END, "\nRecording completed. Starting playback...\n", "info")
+                        output_text.see(tk.END)
+                        output_text.update()
+
+                        ffplay_process = subprocess.Popen(
+                            ["ffplay", "-autoexit", output_file],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            close_fds=True
+                        )
+                        
+                        # Wait for playback to complete
+                        ffplay_process.wait()
+                        
+                        if ffplay_process.returncode == 0:
+                            output_text.insert(tk.END, "Audio test completed successfully!\n", "success")
+                            return "run_audio_recording____YES"
+                        else:
+                            output_text.insert(tk.END, f"Playback failed with exit code: {ffplay_process.returncode}\n", "error")
+                            return f"run_audio_recording____NO: Playback exit code {ffplay_process.returncode}"
+                    
+                    time.sleep(0.1)  # Avoid busy-waiting
+                    
+            except Exception as e:
+                output_text.insert(tk.END, f"Error in audio recording: {str(e)}\n", "error")
+                return f"run_audio_recording____NO: {str(e)}"
+            finally:
+                # Close the prompt window when the process finishes
+                root.after(0, prompt_window.destroy)
+                output_text.see(tk.END)
+                output_text.update()
+        
+        # Run the monitor in a separate thread to avoid blocking the GUI
+        monitor_thread = threading.Thread(target=lambda: setattr(monitor_thread, 'result', monitor_process()), daemon=True)
+        monitor_thread.start()
+        monitor_thread.join()  # Wait for the thread to finish
+        return monitor_thread.result
+        
+   except Exception as e:
         if stop_event:
             stop_event.set()
-        output_text.insert(tk.END, f"Error in media recording: {str(e)}\n", "error")
-        return f"run_media_recording____NO: {str(e)}"
+        output_text.insert(tk.END, f"Error in audio recording: {str(e)}\n", "error")
+        # Ensure the prompt window is closed if an exception occurs before process starts
+        if 'prompt_window' in locals():
+            root.after(0, prompt_window.destroy)
+        return f"run_audio_recording____NO: {str(e)}"
 
 def run_system_update(output_text):
     """Run system update with GUI output"""
