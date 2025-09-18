@@ -100,7 +100,7 @@ def run_media_recording(stop_event, output_text):
         prompt_window.lift()  # Ensure the prompt window is on top
         output_text.update_idletasks()
 
-        output_text.insert(tk.END, "\nStarting media recording (audio and video) for 6 seconds...\n", "info")
+        output_text.insert(tk.END, "\nStarting media recording (audio and video) for 10 seconds...\n", "info")
         output_text.see(tk.END)
         output_text.update()
         
@@ -110,7 +110,7 @@ def run_media_recording(stop_event, output_text):
 
         # Run ffmpeg recording process
         ffmpeg_process = subprocess.Popen(
-            ["ffmpeg", "-y", "-f", "alsa", "-i", "default", "-t", "6", output_file],
+            ["ffmpeg", "-y", "-f", "alsa", "-i", "default", "-t", "10", output_file],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             close_fds=True
