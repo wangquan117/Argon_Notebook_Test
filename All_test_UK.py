@@ -642,6 +642,27 @@ COUNTER_FILE="{counter_file}"
 MAX_RESTARTS=$1
 CRON_SCRIPT="{os.path.join(user_home, 'restart_test.sh')}"
 NOTIFY_SCRIPT="{os.path.join(user_home, 'show_notification.sh')}"
+
+# Wait for critical services to ensure boot completion (NVMe ~10-15s)
+for i in {{1..20}}; do  # Max wait 20s, sufficient for NVMe
+    if systemctl is-system-running --quiet || systemctl is-active --quiet graphical.target; then
+        break
+    fi
+    sleep 1
+done
+
+sudo vcgencmd display_power 1
+if command -v xrandr &> /dev/null; then
+    xrandr --output HDMI-1 --mode 1920x1200 --rate 60  # 
+fi
+echo "HDMI forced on, resolution set" | sudo tee /dev/kmsg
+
+# Check and force HDMI on to prevent black screen
+if ! vcgencmd display_power | grep -q "display_power=1"; then
+    echo "HDMI not initialized, forcing on" | sudo tee /dev/kmsg
+    sudo vcgencmd display_power 1
+fi
+
 if [ ! -f "$COUNTER_FILE" ]; then
     echo "1" > "$COUNTER_FILE"
 fi
@@ -654,11 +675,8 @@ if [ "$CURRENT_COUNT" -ge "$MAX_RESTARTS" ]; then
     # Create persistent notification script
     echo '#!/bin/bash' > "$NOTIFY_SCRIPT"
     echo 'export DISPLAY=:0' >> "$NOTIFY_SCRIPT"
-    echo '# Show desktop notification (will auto-close after 10 seconds)' >> "$NOTIFY_SCRIPT"
     echo 'notify-send "Restart Test Completed" "Successfully completed $MAX_RESTARTS reboots!" -i dialog-information -t 10000' >> "$NOTIFY_SCRIPT"
-    echo '# Show persistent dialog that stays until manually closed' >> "$NOTIFY_SCRIPT"
-    echo 'zenity --info --text="Restart test completed after $MAX_RESTARTS reboots.\n\nClick OK to close this notification." --title="Test Completed" --width=400 --height=200' >> "$NOTIFY_SCRIPT"
-    echo '# Clean up only the autostart entry (keep notification script)' >> "$NOTIFY_SCRIPT"
+    echo 'zenity --info --text="Restart test completed after $MAX_RESTARTS reboots.\\n\\nClick OK to close this notification." --title="Test Completed" --width=400 --height=200' >> "$NOTIFY_SCRIPT"
     echo 'rm -f ~/.config/autostart/restart_notifier.desktop' >> "$NOTIFY_SCRIPT"
     chmod +x "$NOTIFY_SCRIPT"
     
@@ -680,12 +698,16 @@ fi
 NEXT_COUNT=$((CURRENT_COUNT + 1))
 echo "$NEXT_COUNT" > "$COUNTER_FILE"
 echo "Reboot #$NEXT_COUNT/$MAX_RESTARTS" | sudo tee /dev/kmsg
+
 if ! crontab -l | grep -q "$CRON_SCRIPT"; then
     (crontab -l 2>/dev/null; echo "@reboot /bin/bash $CRON_SCRIPT $MAX_RESTARTS") | crontab -
 fi
-sleep 10
+
+# Short sleep for NVMe (fast boot)
+sleep 25  # 12s for NVMe, adjustable to 10s if stable
 echo "Restarting now..." | sudo tee /dev/kmsg
-sudo /sbin/reboot
+sudo sync
+sudo reboot  # Standard reboot, no -f
 """
     script_path = os.path.join(user_home, "restart_test.sh")
     with open(script_path, "w") as f:
@@ -704,13 +726,14 @@ def start_restart_test(restart_count, output_text):
             "NetworkManager-wait-online.service",
             "alsa-restore.service",
             "rpi-eeprom-update.service",
+            #"argononeupduser.service",
             "packagekit.service"
         ]
-        
+       
         output_text.insert(tk.END, "Disabling system services...\n", "info")
         output_text.see(tk.END)
         output_text.update()
-        
+       
         for service in services_to_disable:
             try:
                 result = subprocess.run(
@@ -730,7 +753,7 @@ def start_restart_test(restart_count, output_text):
                 output_text.insert(tk.END, f"Timeout disabling {service}\n", "warning")
             except Exception as e:
                 output_text.insert(tk.END, f"Error disabling {service}: {str(e)}\n", "warning")
-        
+       
         output_text.insert(tk.END, "Service disabling completed\n", "info")
         output_text.see(tk.END)
         output_text.update()
@@ -743,7 +766,7 @@ def start_restart_test(restart_count, output_text):
             current_cron = subprocess.check_output(["crontab", "-l"], stderr=subprocess.DEVNULL).decode()
         except subprocess.CalledProcessError:
             current_cron = ""
-        
+       
         if cron_cmd not in current_cron:
             with tempfile.NamedTemporaryFile(mode="w+") as tmp:
                 if current_cron.strip():
@@ -755,8 +778,9 @@ def start_restart_test(restart_count, output_text):
         output_text.see(tk.END)
         output_text.update()
         time.sleep(10)
-        subprocess.Popen(["sudo", "/sbin/reboot"], start_new_session=True)
-        
+        subprocess.Popen(["sudo", "sync"], start_new_session=True)
+        subprocess.Popen(["sudo", "reboot"], start_new_session=True)
+       
         output_text.insert(tk.END, "The reboot sequence has been initiated....\n", "success")
     except Exception as e:
         output_text.insert(tk.END, f"false: {str(e)}\n", "error")
