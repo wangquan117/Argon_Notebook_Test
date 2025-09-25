@@ -898,10 +898,10 @@ def cleanup_and_exit(root):
         os.path.join(home_dir, 'restart_count.txt'),
         os.path.join(home_dir, 'show_notification.sh'),
         os.path.join(home_dir, 'Videos/Webcam'),
-        os.path.join(home_dir, 'Desktop', 'music_e.mp3'),
-        os.path.join(home_dir, 'Desktop', 'my_video-1.mkv'),
-        os.path.join(home_dir, 'Desktop', 'my_video-2.mkv'),
-        os.path.join(home_dir, 'Desktop', 'my_video-3.mkv'),
+        os.path.join(home_dir, 'music_e.mp3'),
+        os.path.join(home_dir, 'my_video-1.mkv'),
+        os.path.join(home_dir, 'my_video-2.mkv'),
+        os.path.join(home_dir, 'my_video-3.mkv'),
         os.path.join(home_dir, 'TemperatureTests')
     ]
     removed = []
