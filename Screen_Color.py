@@ -37,15 +37,13 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 running = False
+            elif event.key == pygame.K_SPACE:  
+                color_index = (color_index + 1) % len(colors)  
     
     if not running:
         break
 
     screen.fill(colors[color_index])
     pygame.display.flip()
-
-    time.sleep(2)  
-
-    color_index = (color_index + 1) % len(colors)
 
 pygame.quit()
