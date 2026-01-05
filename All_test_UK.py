@@ -110,7 +110,7 @@ def run_media_recording(stop_event, output_text):
 
         # Run ffmpeg recording process
         ffmpeg_process = subprocess.Popen(
-            ["ffmpeg", "-y", "-f", "alsa", "-i", "default", "-t", "10", output_file],
+            ["ffmpeg", "-y", "-f", "alsa", "-i", "plughw:2,0", "-t", "10", output_file],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             close_fds=True
@@ -892,6 +892,7 @@ def cleanup_and_exit(root):
         'test_audio.wav',
         'ffmpeg.log',
         'ffplay.log',
+        'recorded_audio.wav',
         os.path.join(home_dir, 'argon_notebook_test_UK.sh'),
         os.path.join(home_dir, 'argon-scripts'),
         os.path.join(home_dir, 'Desktop', 'Argon_Test_Toolkit_One.desktop'),
