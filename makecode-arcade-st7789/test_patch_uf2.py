@@ -90,12 +90,13 @@ class PatchTests(unittest.TestCase):
         cf2_off = 0x100FF000 - start
         self.assertEqual(struct.unpack_from("<I", img, cf2_off)[0], p.CFG_MAGIC0)
 
-    def test_cfg0_xor_does_not_equal_st7789_fix(self):
-        # Document why 0x010000A8 cannot fix this: it only XORs palette + BGR.
-        cfg0 = 0x010000A8
-        self.assertEqual(cfg0 & 0xFF, 0xA8)
-        self.assertTrue(cfg0 & 0x01000000)
-        self.assertNotEqual(cfg0, 0xFFFFFF)
+
+    def test_cfg0_without_mv_and_offset(self):
+        self.assertEqual(p.pack_cfg0(0x40), 0x40)
+        self.assertEqual(p.pack_cfg0(0x40, off_x=80), 0x5040)
+        self.assertEqual(p.pack_cfg0(0x40, off_y=80), 0x500040)
+        self.assertEqual(0xA0 & 0x20, 0x20)
+        self.assertEqual(0x40 & 0x20, 0)
 
 
 if __name__ == "__main__":

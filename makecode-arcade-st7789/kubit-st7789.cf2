@@ -35,10 +35,10 @@ DISPLAY_TYPE = 9341
 DISPLAY_WIDTH = 320
 DISPLAY_HEIGHT = 240
 
-# Low byte = MADCTL. 0xA0 = MY|MV (landscape that already matches this panel).
-# Add 0x08 (0xA8) only if red/blue are swapped AFTER the UF2 patch.
-# 0x01000000 XORs the palette; that does not fix ST7789 green tint.
-DISPLAY_CFG0 = 0xA0
+# Low byte = MADCTL. Do not set MV (0x20): CODAL already swaps CASET/RASET.
+# 0xA0 (MY|MV) causes 90° rotation + ~80px snow on this driver.
+# Try 0x40, then 0x00 / 0x80 / 0xC0 if mirrored. Add 0x08 if red/blue swap.
+DISPLAY_CFG0 = 0x40
 
 # 0xFFFFFF = skip FRMCTR1 (0xB1). On ST7789 that register is RGBCTRL, not frame rate.
 DISPLAY_CFG1 = 0xFFFFFF

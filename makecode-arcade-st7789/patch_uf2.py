@@ -44,7 +44,7 @@ ST7789_INIT_PREFIX = bytes(
         0x01, 0x80, 150,  # SWRESET + 150ms
         0x11, 0x80, 255,  # SLPOUT + 255ms
         0x3A, 0x81, 0x55, 10,  # COLMOD = 16bpp + 10ms
-        0x36, 0x01, 0xA0,  # MADCTL placeholder (CFG0 wins after init)
+        0x36, 0x01, 0x40,  # MADCTL: no MV. CODAL already swaps CASET/RASET.
         0x21, 0x00,  # INVON (typical IPS ST7789)
         0x13, 0x80, 10,  # NORON
         0x29, 0x80, 100,  # DISPON
@@ -112,7 +112,7 @@ KUBIT_CF2_ENTRIES = [
     (CFG_PIN_DISPLAY_DC, 8),
     (CFG_DISPLAY_WIDTH, 320),
     (CFG_DISPLAY_HEIGHT, 240),
-    (CFG_DISPLAY_CFG0, 0xA0),
+    (CFG_DISPLAY_CFG0, 0x40),
     (CFG_DISPLAY_CFG1, 0xFFFFFF),
     (CFG_DISPLAY_CFG2, 0x28),
     (CFG_PIN_DISPLAY_RST, 1),
@@ -237,8 +237,25 @@ def build_palette_stub(lut_addr: int) -> bytes:
     return bytes(stub)
 
 
-def build_cf2(entries: list[tuple[int, int]], madctl: int, cfg2: int) -> bytes:
-    items = [(k, madctl if k == CFG_DISPLAY_CFG0 else v) for k, v in entries]
+def pack_cfg0(madctl: int, off_x: int = 0, off_y: int = 0) -> int:
+    """CFG0: byte0=MADCTL, byte1=offX, byte2=offY.
+
+    Do not set MADCTL MV (0x20). CODAL ST7735::setAddrWindow already writes
+    CASET=Y and RASET=X. MV plus that swap yields a 90° image and an 80px
+    (320-240) snow band on 240x320 ST7789 panels.
+    """
+    return (madctl & 0xFF) | ((off_x & 0xFF) << 8) | ((off_y & 0xFF) << 16)
+
+
+def build_cf2(
+    entries: list[tuple[int, int]],
+    madctl: int,
+    cfg2: int,
+    off_x: int = 0,
+    off_y: int = 0,
+) -> bytes:
+    cfg0 = pack_cfg0(madctl, off_x, off_y)
+    items = [(k, cfg0 if k == CFG_DISPLAY_CFG0 else v) for k, v in entries]
     items = [(k, cfg2 if k == CFG_DISPLAY_CFG2 else v) for k, v in items]
     buf = bytearray(4096)
     buf[0:4] = pack_u32(CFG_MAGIC0)
@@ -309,6 +326,8 @@ def patch_image(
     skip_init: bool,
     skip_palette: bool,
     skip_cf2: bool,
+    off_x: int = 0,
+    off_y: int = 0,
 ) -> dict[str, str]:
     notes: dict[str, str] = {}
     rel = bytes(img)
@@ -345,7 +364,13 @@ def patch_image(
         notes["palette"] = f"patched {len(hits)} site(s); LUT at 0x{lut_addr:08X}"
 
     if not skip_cf2:
-        cf2 = build_cf2(KUBIT_CF2_ENTRIES, madctl=madctl, cfg2=spi_mhz & 0xFF)
+        cf2 = build_cf2(
+            KUBIT_CF2_ENTRIES,
+            madctl=madctl,
+            cfg2=spi_mhz & 0xFF,
+            off_x=off_x,
+            off_y=off_y,
+        )
         # Arcade looks 4 KB before the end of 1 MB and 2 MB (typical RP2040 sizes).
         for mb in (1, 2):
             addr = FLASH_BASE + mb * 1024 * 1024 - 4096
@@ -389,7 +414,14 @@ def main(argv: list[str] | None = None) -> int:
         "If omitted, uses the only *.uf2 in the current folder.",
     )
     p.add_argument("-o", "--output", type=Path, help="Output UF2 (default: <name>-st7789.uf2)")
-    p.add_argument("--madctl", default="0xA0", help="DISPLAY_CFG0 MADCTL byte (default 0xA0)")
+    p.add_argument(
+        "--madctl",
+        default="0x40",
+        help="DISPLAY_CFG0 MADCTL. Default 0x40 (no MV). "
+        "0xA0 includes MV and rotates 90° with an 80px snow band on this driver.",
+    )
+    p.add_argument("--off-x", type=int, default=0, help="DISPLAY_CFG0 X offset (0-255)")
+    p.add_argument("--off-y", type=int, default=0, help="DISPLAY_CFG0 Y offset (0-255)")
     p.add_argument("--spi-mhz", type=int, default=40, help="SPI frequency in MHz (CFG2 low byte)")
     p.add_argument("--no-invert", action="store_true", help="Send INVOFF instead of INVON")
     p.add_argument("--skip-init", action="store_true")
@@ -425,6 +457,7 @@ def main(argv: list[str] | None = None) -> int:
 
     madctl = int(args.madctl, 0) & 0xFF
     print(f"读取: {uf2_path.resolve()} ({uf2_path.stat().st_size} bytes)")
+    print(f"MADCTL=0x{madctl:02X} off=({args.off_x},{args.off_y})")
     data = uf2_path.read_bytes()
     flash, family = parse_uf2(data)
     if family not in (None, UF2_RP2040_FAMILY):
@@ -439,6 +472,8 @@ def main(argv: list[str] | None = None) -> int:
         skip_init=args.skip_init,
         skip_palette=args.skip_palette,
         skip_cf2=args.skip_cf2,
+        off_x=args.off_x,
+        off_y=args.off_y,
     )
     new_flash = image_to_flash(start, img)
     fill_to = FLASH_BASE + 2 * 1024 * 1024 if args.e14_pad else None

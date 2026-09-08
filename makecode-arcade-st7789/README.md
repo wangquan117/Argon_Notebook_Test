@@ -9,7 +9,7 @@
 | CF2 字段 | 官方含义（ST7735 / ILI9341） | 你这块 ST7789 上实际发生的事 |
 | --- | --- | --- |
 | `DISPLAY_TYPE = ILI9341` | 走 320×240、像素 2× 放大 | 必须保留，否则只有 160×128 |
-| `DISPLAY_CFG0` 低字节 | MADCTL（旋转 / RGB·BGR） | 你用 `0xA0` 方向已经对了 |
+| `DISPLAY_CFG0` 低字节 | MADCTL（旋转 / RGB·BGR） | **不要用 `0xA0`（含 MV）**。Arcade 已对调 CASET/RASET，再开 MV 会旋转 90° 并在左边留下约 80px 雪花。默认 `0x40`。 |
 | `DISPLAY_CFG0` 的 `0x01000000` | 把调色板 XOR 反相 | 只会正负片式翻转，**去不掉绿罩** |
 | `DISPLAY_CFG1` | ILI 的 FRMCTR1（命令 `0xB1`） | ST7789 的 `0xB1` 是 RGBCTRL，应设为 `0xFFFFFF` 跳过 |
 | `DISPLAY_CFG2` 低字节 | SPI 时钟（MHz） | 建议 `0x28`（40 MHz），比 50 MHz 稳 |
@@ -139,19 +139,21 @@ Get-ChildItem D:\downlo\*-st7789.uf2
 | `找不到输入文件` | UF2 文件名不对，用 `dir *.uf2` 看真实名字。 |
 | `ILI9341 init signature ... not found` | 不是 Pico/R2 目标下载的 UF2。在 MakeCode 选 **Raspberry Pi Pico (R2)** 再下载。 |
 | `ENC16 palette loop signature ... not found` | Arcade 运行时版本变了，把完整报错发回来。 |
-| 生成了 uf2 仍发绿 | 确认烧的是 `*-st7789.uf2`。再试 `--madctl 0xA8` 或 `--no-invert`。 |
+| 颜色对、画面转 90°、左边约 1/4 雪花 | `0xA0` 的 MV 位冲突。改用 `--madctl 0x40`（或 `0x80` / `0xC0` / `0x00`，都不要带 `0x20`）。 |
+| 生成了 uf2 仍发绿 | 确认烧的是 `*-st7789.uf2`。再试 `--madctl 0x48` 或 `--no-invert`。 |
 
 
-若方向反了或红蓝反了，改 MADCTL 再打一次补丁（不必改脚本里的引脚）：
+若方向反了或红蓝反了，改 MADCTL 再打一次补丁（不必改脚本里的引脚）。
 
-```bash
-# 红蓝反了：加上 BGR 位
-python3 patch_uf2.py arcade-Avoid-the-Fans-2.uf2 --madctl 0xA8
+**颜色已对、但转 90° 且左边有雪花：** 不要再用 `0xA0` / `0x60` / `0xE0`（这些带 MV=0x20）。Arcade 驱动把 X/Y 写反了，再开 MV 等于转两次，多出来的 80 像素（320−240）就是雪花带。
 
-# 颜色像负片：关掉 INVON
-python3 patch_uf2.py arcade-Avoid-the-Fans-2.uf2 --no-invert
+```powershell
+# 先试这个（推荐）
+py -3 "D:\downlo\patch_uf2.py" "D:\downlo\arcade-Avoid-the-Fans-2.uf2" -o "D:\downlo\arcade-Avoid-the-Fans-2-st7789.uf2" --madctl 0x40
 
-# 仍偏色时的其它常用 MADCTL：0x00 0x40 0x60 0x80 0xC0 0xE0
+# 上下或左右反了，在无 MV 的四个值里换：0x00  0x40  0x80  0xC0
+# 红蓝反了：给上面的值加 0x08，例如 0x48
+# 颜色像负片：加 --no-invert
 ```
 
 `kubit-st7789.cf2` 可丢进 [UF2 patcher](https://microsoft.github.io/uf2/patcher/) 单独写配置，**只烧 CF2 不够修绿**，必须经过 `patch_uf2.py`。
@@ -160,6 +162,6 @@ python3 patch_uf2.py arcade-Avoid-the-Fans-2.uf2 --no-invert
 
 - 把 114 字节 ILI9341 初始化换成：`SWRESET → SLPOUT → COLMOD=0x55 → MADCTL → INVON → NORON → DISPON`
 - 把 ENC16 灰度循环换成从 `0x100FE000` 拷贝 Arcade 默认 16 色 RGB565 表
-- 写入本机 CF2：`DISPLAY_TYPE=9341`，`CFG0=0xA0`，`CFG1=0xFFFFFF`，`CFG2=40`，以及上面的 GPIO
+- 写入本机 CF2：`DISPLAY_TYPE=9341`，`CFG0=0x40`（无 MV），`CFG1=0xFFFFFF`，`CFG2=40`，以及上面的 GPIO
 
 限制：调色板被写死为 Arcade 默认 16 色。用 `setPalette()` 换主题的游戏颜色会不准；Avoid the Fans 这类默认调色板游戏正常。
