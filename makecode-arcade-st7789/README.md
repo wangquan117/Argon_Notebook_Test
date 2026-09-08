@@ -30,6 +30,16 @@ RST=GP1，DC=GP8，CS=GP9，SCK=GP10，MOSI=GP11，BL=GP15。RST 有 10 kΩ 下�
 
 ## Windows PowerShell 详细步骤（`D:\downlo`）
 
+`D:\downlo` 里通常**只有游戏 UF2，没有本仓库的 `patch_uf2.py`**。请先下载脚本，再按全路径调用（和 `python "...\patch_arcade_uf2.py" "D:\downlo\....uf2"` 同一写法）：
+
+```powershell
+Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/wangquan117/Argon_Notebook_Test/cursor/st7789-color-fix-2a90/makecode-arcade-st7789/patch_uf2.py" -OutFile "D:\downlo\patch_uf2.py"
+
+py -3 "D:\downlo\patch_uf2.py" "D:\downlo\arcade-Avoid-the-Fans-2.uf2" -o "D:\downlo\arcade-Avoid-the-Fans-2-st7789.uf2"
+```
+
+必须用原始的 `arcade-Avoid-the-Fans-2.uf2`（约 589312 字节），不要拿已经 `_patched` / `_st7789_init_only` 的文件再打一遍。
+
 你上次这条命令**几乎肯定没有真正跑到脚本**：
 
 ```text
