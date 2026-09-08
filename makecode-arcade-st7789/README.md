@@ -28,15 +28,109 @@ RST=GP1，DC=GP8，CS=GP9，SCK=GP10，MOSI=GP11，BL=GP15。RST 有 10 kΩ 下�
 
 按键：上 22、右 23、下 24、左 25、A 26、B 6（BOOT0）、MENU=21、MENU2=20，都是按下接地，对应 `ACTIVE_LOW_PULL_UP`。
 
-## 用法
+## Windows PowerShell 详细步骤（`D:\downlo`）
 
-需要本机 Python 3（无需第三方库）：
+你上次这条命令**几乎肯定没有真正跑到脚本**：
 
-```bash
-python3 patch_uf2.py arcade-Avoid-the-Fans-2.uf2 -o arcade-Avoid-the-Fans-2-st7789.uf2
+```text
+PS D:\downlo> python3 makecode-arcade-st7789/patch_uf2.py arcade-Avoid-the-Fans-2.uf2 ...
 ```
 
-然后让 RP2040 进 BOOTSEL，拖入 `*-st7789.uf2`。
+常见两个原因：
+
+1. `D:\downlo` 里没有 `makecode-arcade-st7789\patch_uf2.py`（脚本在本仓库里，不会自动出现在下载目录）。
+2. Windows 的 `python3` 经常是「微软商店占位符」，**立刻返回、不报错、不生成文件**。请改用 `py -3` 或 `python`。
+
+### 第 1 步：确认 Python 能用
+
+打开 PowerShell，逐条执行：
+
+```powershell
+py -3 --version
+python --version
+Get-Command python3 | Format-List Source,CommandType
+```
+
+- `py -3 --version` 应类似 `Python 3.12.x`。
+- 若三条都失败：打开 https://www.python.org/downloads/ 安装，**勾选 Add python.exe to PATH**，关掉并重新打开 PowerShell。
+- 若只有 `python3` 能“执行”但 `--version` 弹出商店或什么都不印：不要再用 `python3`。
+
+### 第 2 步：把脚本和游戏固件放到同一文件夹
+
+在 `D:\downlo` 里最终应看到：
+
+```text
+D:\downlo\
+  arcade-Avoid-the-Fans-2.uf2      ← 你从 arcade.makecode.com 下的原件
+  patch_uf2.py                     ← 从本仓库复制
+  patch.bat                        ← 可选，双击也能跑
+```
+
+复制脚本（任选一种）：
+
+- 浏览器打开并另存为 `D:\downlo\patch_uf2.py`：  
+  https://raw.githubusercontent.com/wangquan117/Argon_Notebook_Test/cursor/st7789-color-fix-2a90/makecode-arcade-st7789/patch_uf2.py
+- 或从本机仓库复制：
+
+```powershell
+Copy-Item -Force .\makecode-arcade-st7789\patch_uf2.py D:\downlo\patch_uf2.py
+Copy-Item -Force .\makecode-arcade-st7789\patch.bat D:\downlo\patch.bat
+```
+
+检查文件是否真的在：
+
+```powershell
+cd D:\downlo
+Get-ChildItem patch_uf2.py, arcade-Avoid-the-Fans-2.uf2
+```
+
+两个都要列出。缺哪个就补哪个。`arcade-Avoid-the-Fans-2.uf2` 一般有几百 KB～一两 MB；如果只有几十字节，说明下载坏了。
+
+### 第 3 步：打补丁（推荐）
+
+```powershell
+cd D:\downlo
+py -3 .\patch_uf2.py .\arcade-Avoid-the-Fans-2.uf2
+```
+
+成功时会打印类似：
+
+```text
+当前目录: D:\downlo
+Python: C:\...\python.exe (3.12.x)
+读取: D:\downlo\arcade-Avoid-the-Fans-2.uf2 (...... bytes)
+已生成: D:\downlo\arcade-Avoid-the-Fans-2-st7789.uf2 (...... bytes)
+  ili9341_init: patched 1 site(s) ...
+  palette: patched 1 site(s); LUT at 0x100FE000
+  cf2: wrote Kubit CF2 ...
+```
+
+然后确认新文件：
+
+```powershell
+Get-ChildItem D:\downlo\*-st7789.uf2
+```
+
+也可以双击 `D:\downlo\patch.bat`（脚本会自己找 `py` / `python`）。
+
+### 第 4 步：烧录
+
+1. 按住板子 **BOOT / BOOTSEL**（原理图上的 BOOT0，你这边接 GP6，也是 B 键），插 USB 或再按复位。
+2. 资源管理器出现 `RPI-RP2` 盘。
+3. **只拖入** `arcade-Avoid-the-Fans-2-st7789.uf2`。
+4. **不要再拖** 原来的 `arcade-Avoid-the-Fans-2.uf2`，否则补丁会被盖掉，又变绿。
+
+### 失败对照
+
+| 现象 | 处理 |
+| --- | --- |
+| 命令立刻回到 `PS D:\downlo>`，没有任何字 | 不要用 `python3`。改 `py -3`。 |
+| `can't open file ... patch_uf2.py` | 脚本不在当前目录，先做第 2 步。 |
+| `找不到输入文件` | UF2 文件名不对，用 `dir *.uf2` 看真实名字。 |
+| `ILI9341 init signature ... not found` | 不是 Pico/R2 目标下载的 UF2。在 MakeCode 选 **Raspberry Pi Pico (R2)** 再下载。 |
+| `ENC16 palette loop signature ... not found` | Arcade 运行时版本变了，把完整报错发回来。 |
+| 生成了 uf2 仍发绿 | 确认烧的是 `*-st7789.uf2`。再试 `--madctl 0xA8` 或 `--no-invert`。 |
+
 
 若方向反了或红蓝反了，改 MADCTL 再打一次补丁（不必改脚本里的引脚）：
 

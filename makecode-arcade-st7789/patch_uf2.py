@@ -329,7 +329,7 @@ def patch_image(
             f"0x{start + h:08X}" for h in hits
         )
 
-        lut_addr = 0x100FE000  # 4 KB sector just before the 1 MB CF2 slot
+    lut_addr = 0x100FE000  # 4 KB sector just before the 1 MB CF2 slot
     if not skip_palette:
         hits = find_all(bytes(img), ENC16_SIG)
         if not hits:
@@ -356,9 +356,38 @@ def patch_image(
     return notes
 
 
+def _configure_stdio() -> None:
+    if sys.platform != "win32":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
+
+def _pick_input_uf2() -> Path | None:
+    here = Path.cwd()
+    hits = [
+        f
+        for f in here.glob("*.uf2")
+        if "-st7789" not in f.stem.lower() and f.is_file()
+    ]
+    if len(hits) == 1:
+        return hits[0]
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
+    _configure_stdio()
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("uf2", type=Path, help="Arcade game UF2 from arcade.makecode.com (R2 / Pico)")
+    p.add_argument(
+        "uf2",
+        nargs="?",
+        type=Path,
+        help="Arcade game UF2 from arcade.makecode.com (R2 / Pico). "
+        "If omitted, uses the only *.uf2 in the current folder.",
+    )
     p.add_argument("-o", "--output", type=Path, help="Output UF2 (default: <name>-st7789.uf2)")
     p.add_argument("--madctl", default="0xA0", help="DISPLAY_CFG0 MADCTL byte (default 0xA0)")
     p.add_argument("--spi-mhz", type=int, default=40, help="SPI frequency in MHz (CFG2 low byte)")
@@ -373,8 +402,30 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = p.parse_args(argv)
 
+    print(f"当前目录: {Path.cwd()}")
+    print(f"Python: {sys.executable} ({sys.version.split()[0]})")
+
+    uf2_path = args.uf2
+    if uf2_path is None:
+        uf2_path = _pick_input_uf2()
+        if uf2_path is None:
+            p.error(
+                "没有指定 UF2，当前目录也找不到唯一的游戏固件。\n"
+                "请把 patch_uf2.py 和 arcade-Avoid-the-Fans-2.uf2 放在同一文件夹后重试，例如:\n"
+                "  py -3 patch_uf2.py arcade-Avoid-the-Fans-2.uf2"
+            )
+        print(f"未指定输入文件，自动使用: {uf2_path.name}")
+
+    uf2_path = uf2_path.expanduser()
+    if not uf2_path.is_file():
+        raise SystemExit(
+            f"找不到输入文件: {uf2_path.resolve() if uf2_path.exists() else uf2_path}\n"
+            f"当前目录内容请用 dir *.uf2 检查。Windows 上请用 py -3 而不是 python3。"
+        )
+
     madctl = int(args.madctl, 0) & 0xFF
-    data = args.uf2.read_bytes()
+    print(f"读取: {uf2_path.resolve()} ({uf2_path.stat().st_size} bytes)")
+    data = uf2_path.read_bytes()
     flash, family = parse_uf2(data)
     if family not in (None, UF2_RP2040_FAMILY):
         print(f"warning: UF2 family 0x{family:08X} is not RP2040", file=sys.stderr)
@@ -392,12 +443,13 @@ def main(argv: list[str] | None = None) -> int:
     new_flash = image_to_flash(start, img)
     fill_to = FLASH_BASE + 2 * 1024 * 1024 if args.e14_pad else None
     out = emit_uf2(new_flash, family or UF2_RP2040_FAMILY, fill_to=fill_to)
-    dest = args.output or args.uf2.with_name(args.uf2.stem + "-st7789.uf2")
+    dest = args.output or uf2_path.with_name(uf2_path.stem + "-st7789.uf2")
+    dest = dest.expanduser()
     dest.write_bytes(out)
-    print(f"wrote {dest} ({len(out)} bytes)")
+    print(f"已生成: {dest.resolve()} ({len(out)} bytes)")
     for k, v in notes.items():
         print(f"  {k}: {v}")
-    print("Flash this UF2 in BOOTSEL mode. Do not re-flash the original arcade UF2 afterwards.")
+    print("请用 BOOTSEL 模式烧录这个新文件，不要再覆盖烧录原来的 arcade-*.uf2。")
     return 0
 
 
