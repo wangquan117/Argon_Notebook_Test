@@ -95,7 +95,13 @@ class PatchTests(unittest.TestCase):
         self.assertEqual(struct.unpack_from("<I", img, cf2_off)[0], p.CFG_MAGIC0)
 
 
-    def test_cfg0_without_mv_and_offset(self):
+    def test_factory_cf2_uf2_has_magic_at_both_slots(self):
+        uf2 = p.emit_factory_cf2_uf2(madctl=0x40, spi_mhz=40)
+        flash, family = p.parse_uf2(uf2)
+        self.assertEqual(family, p.UF2_RP2040_FAMILY)
+        self.assertIn(0x100FF000, flash)
+        self.assertIn(0x101FF000, flash)
+        self.assertEqual(struct.unpack_from("<I", flash[0x100FF000], 0)[0], p.CFG_MAGIC0)
         self.assertEqual(p.pack_cfg0(0x40), 0x40)
         self.assertEqual(p.pack_cfg0(0x40, off_x=80), 0x5040)
         self.assertEqual(p.pack_cfg0(0x40, off_y=80), 0x500040)

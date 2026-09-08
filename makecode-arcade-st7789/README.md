@@ -22,6 +22,29 @@
 
 所以流程应是：**给「游戏 UF2」打补丁**（初始化 + 调色板 + 你的 CF2），再烧录补丁后的文件。不要再覆盖烧录 `arcade-Avoid-the-Fans-2.uf2` 原件。
 
+## 两层改动：CF2 一次，游戏补丁每次
+
+RP2040 上 Arcade 把硬件配置（CF2）放在 Flash 接近末尾（1MB/2MB 前 4KB），游戏程序从 `0x10000000` 起。这是两块互不替代的数据。
+
+| 层 | 写在哪 | 一次烧设备补丁再烧原版游戏，还在吗 | 内容 |
+| --- | --- | --- | --- |
+| **CF2** | `0x100FF000` / `0x101FF000` | 一般还在（游戏 UF2 通常写不到这里） | 按键、SPI 引脚、`DISPLAY_BL`、`JACK_SND`、`SPEAKER_AMP`、`MADCTL 0x40`、`CFG1=0xFFFFFF` |
+| **游戏二进制补丁** | 游戏代码里 | **会被原版游戏盖掉** | ST7789 初始化序列、默认 16 色 LUT（修绿） |
+
+所以：
+
+- **只烧设备 CF2，再烧 MakeCode 原版游戏：按键/音量/亮度/方向配置可以保留，屏幕会再次发绿。**
+- 这块是 ST7789，官方运行时仍按 ILI9341 初始化。**每个从 arcade.makecode.com 下载的游戏都要再跑一遍 `patch_uf2.py`。**
+- 「先烧补丁、再烧任意原版游戏就全好」只有 ST7735/真 ILI9341 板能成立。ST7789 必须游戏补丁，或做成 PicoPad 那种启动器在烧录时自动打补丁。
+
+生成仅含 CF2 的设备文件（方便恢复引脚，不能单独修绿）：
+
+```powershell
+py -3 "D:\downlo\patch_uf2.py" --cf2-only -o "D:\downlo\kubit-factory-cf2.uf2" --madctl 0x40
+```
+
+日常换游戏：对每个新 UF2 执行 `patch_uf2.py ... --madctl 0x40`，只烧生成的 `*-st7789.uf2`。
+
 ## 你这块板的引脚（与原理图一致）
 
 RST=GP1，DC=GP8，CS=GP9，SCK=GP10，MOSI=GP11，BL=GP15。RST 有 10 kΩ 下拉，固件里的复位脉冲仍然有效。`LCD_TE`（GP14）Arcade 用不到。

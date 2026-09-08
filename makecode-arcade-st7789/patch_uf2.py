@@ -383,6 +383,28 @@ def patch_image(
     return notes
 
 
+def emit_factory_cf2_uf2(
+    madctl: int,
+    spi_mhz: int,
+    off_x: int = 0,
+    off_y: int = 0,
+) -> bytes:
+    """CF2-only UF2: pins/audio/BL/MADCTL. Does not patch ST7789 init or palette."""
+    cf2 = build_cf2(
+        KUBIT_CF2_ENTRIES,
+        madctl=madctl,
+        cfg2=spi_mhz & 0xFF,
+        off_x=off_x,
+        off_y=off_y,
+    )
+    flash: dict[int, bytes] = {}
+    for mb in (1, 2):
+        base = FLASH_BASE + mb * 1024 * 1024 - 4096
+        for i in range(0, 4096, BLOCK):
+            flash[base + i] = cf2[i : i + BLOCK]
+    return emit_uf2(flash, UF2_RP2040_FAMILY)
+
+
 def _configure_stdio() -> None:
     if sys.platform != "win32":
         return
@@ -430,6 +452,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--skip-palette", action="store_true")
     p.add_argument("--skip-cf2", action="store_true")
     p.add_argument(
+        "--cf2-only",
+        action="store_true",
+        help="Write a factory CF2 UF2 (pins/audio/BL only). No game binary patches.",
+    )
+    p.add_argument(
         "--e14-pad",
         action="store_true",
         help="Fill 0xFF gaps up to 2MB (RP2040-E14 workaround; much larger UF2)",
@@ -438,6 +465,22 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"当前目录: {Path.cwd()}")
     print(f"Python: {sys.executable} ({sys.version.split()[0]})")
+
+    madctl = int(args.madctl, 0) & 0xFF
+
+    if args.cf2_only:
+        dest = (args.output or Path("kubit-factory-cf2.uf2")).expanduser()
+        out = emit_factory_cf2_uf2(
+            madctl=madctl,
+            spi_mhz=args.spi_mhz,
+            off_x=args.off_x,
+            off_y=args.off_y,
+        )
+        dest.write_bytes(out)
+        print(f"已生成设备 CF2: {dest.resolve()} ({len(out)} bytes)")
+        print("烧这个只写入引脚/音量功放/背光/MADCTL。")
+        print("之后若直接烧 MakeCode 原版游戏，颜色仍会发绿，每个游戏仍需 patch_uf2.py。")
+        return 0
 
     uf2_path = args.uf2
     if uf2_path is None:
