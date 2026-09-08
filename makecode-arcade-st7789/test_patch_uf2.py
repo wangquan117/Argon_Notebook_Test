@@ -58,6 +58,10 @@ class PatchTests(unittest.TestCase):
         self.assertEqual(keys[p.CFG_DISPLAY_CFG1], 0xFFFFFF)
         self.assertEqual(keys[p.CFG_PIN_DISPLAY_CS], 9)
         self.assertEqual(keys[p.CFG_PIN_BTN_A], 26)
+        self.assertEqual(keys[p.CFG_PIN_SPEAKER_AMP], 2)
+        self.assertEqual(keys[p.CFG_PIN_JACK_SND], 0)
+        self.assertEqual(keys[p.CFG_PIN_DISPLAY_BL], 15)
+        self.assertNotIn(60, keys)  # JACK_TX must not claim SPEAK_EN
 
     def test_patch_synthetic_uf2(self):
         firmware = bytearray(0x200)

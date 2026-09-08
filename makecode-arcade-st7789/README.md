@@ -158,6 +158,28 @@ py -3 "D:\downlo\patch_uf2.py" "D:\downlo\arcade-Avoid-the-Fans-2.uf2" -o "D:\do
 
 `kubit-st7789.cf2` 可丢进 [UF2 patcher](https://microsoft.github.io/uf2/patcher/) 单独写配置，**只烧 CF2 不够修绿**，必须经过 `patch_uf2.py`。
 
+## 音量和亮度（改 CF2，不用改游戏代码）
+
+这块板没有音量电位器。PAM8302A 是固定增益，音量只能靠 RP2040 改变 PWM 幅度；亮度靠 `LCD_BL` 的 PWM。
+
+| 原理图网络 | GPIO | 正确的 CF2 | 错误做法 |
+| --- | --- | --- | --- |
+| `LCD_BL` → MOSFET Q2 → `LEDK` | P_15 | `PIN_DISPLAY_BL = P_15`（已有） | 不要拿掉，否则菜单里没有亮度 |
+| `SPEAR` → PAM8302 IN+ | P_0 | `PIN_JACK_SND = P_0` | 音频 PWM 必须走这根 |
+| `SPEAK_EN` → PAM8302 `SD#` | P_2 | **`PIN_SPEAKER_AMP = P_2`** | **不要**写成 `PIN_JACK_TX`。`SD#` 低有效关断，板上 100k 下拉默认静音 |
+
+把 `PIN_JACK_TX = P_2` 改成 `PIN_SPEAKER_AMP = P_2` 后重新打补丁。Arcade 在音量 > 0 时把 `SPEAK_EN` 拉高打开功放；音量调到 0 再拉低静音。
+
+机内调节：按 **MENU**（原理图 SW7 / GPIO21），系统菜单里有 `VOLUME UP/DOWN` 和 `BRIGHTNESS UP/DOWN`。这是官方菜单，不是游戏积木。
+
+改完后仍用 `--madctl 0x40` 以免方向又乱：
+
+```powershell
+Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/wangquan117/Argon_Notebook_Test/cursor/st7789-color-fix-2a90/makecode-arcade-st7789/patch_uf2.py" -OutFile "D:\downlo\patch_uf2.py"
+
+py -3 "D:\downlo\patch_uf2.py" "D:\downlo\arcade-Avoid-the-Fans-2.uf2" -o "D:\downlo\arcade-Avoid-the-Fans-2-st7789.uf2" --madctl 0x40
+```
+
 ## 补丁做了什么
 
 - 把 114 字节 ILI9341 初始化换成：`SWRESET → SLPOUT → COLMOD=0x55 → MADCTL → INVON → NORON → DISPON`
