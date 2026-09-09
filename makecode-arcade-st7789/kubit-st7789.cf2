@@ -1,0 +1,51 @@
+# Kubit / RP2040 + ST7789 (320x240) CF2 for MakeCode Arcade
+# Apply at https://microsoft.github.io/uf2/patcher/
+#
+# CF2 alone cannot fully fix the green tint on ST7789.
+# After flashing this config, you MUST patch the game UF2 with
+# patch_uf2.py (replaces ILI9341 init + grayscale ENC16 palette).
+
+PIN_BTNMX_CLOCK = null
+PIN_BTNMX_DATA = null
+PIN_BTNMX_LATCH = null
+DEFAULT_BUTTON_MODE = ACTIVE_LOW_PULL_UP
+
+PIN_BTN_A = P_26
+PIN_BTN_B = P_6
+PIN_BTN_DOWN = P_24
+PIN_BTN_LEFT = P_25
+PIN_BTN_MENU = P_21
+PIN_BTN_RIGHT = P_23
+PIN_BTN_UP = P_22
+PIN_BTN_MENU2 = P_20
+
+PIN_DISPLAY_RST = P_1
+PIN_DISPLAY_DC = P_8
+PIN_DISPLAY_CS = P_9
+PIN_DISPLAY_SCK = P_10
+PIN_DISPLAY_MOSI = P_11
+PIN_DISPLAY_MISO = null
+PIN_DISPLAY_BL = P_15
+
+# Audio: PWM on SPEAR (GPIO0) into PAM8302 IN+.
+# SPEAK_EN (GPIO2) is PAM8302 SD# with a pulldown — must be SPEAKER_AMP, not JACK_TX.
+PIN_JACK_SND = P_0
+PIN_SPEAKER_AMP = P_2
+PIN_JACK_TX = null
+SPEAKER_VOLUME = 128
+
+# Keep ILI9341 so the runtime uses 160x120 -> 320x240 double-size path.
+DISPLAY_TYPE = 9341
+DISPLAY_WIDTH = 320
+DISPLAY_HEIGHT = 240
+
+# Low byte = MADCTL. Do not set MV (0x20): CODAL already swaps CASET/RASET.
+# 0xA0 (MY|MV) causes 90° rotation + ~80px snow on this driver.
+# Try 0x40, then 0x00 / 0x80 / 0xC0 if mirrored. Add 0x08 if red/blue swap.
+DISPLAY_CFG0 = 0x40
+
+# 0xFFFFFF = skip FRMCTR1 (0xB1). On ST7789 that register is RGBCTRL, not frame rate.
+DISPLAY_CFG1 = 0xFFFFFF
+
+# SPI clock in MHz. 40 is safer than 50 on some ST7789 modules.
+DISPLAY_CFG2 = 0x28
