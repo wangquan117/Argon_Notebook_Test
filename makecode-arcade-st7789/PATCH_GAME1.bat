@@ -93,7 +93,7 @@ goto LOOP
 :DONE
 echo.
 if "%FAIL%"=="1" goto FAIL
-echo All done. Output is about 4MB (E14 pad). BOOTSEL and copy *-st7789.uf2 to RPI-RP2.
+echo All done. Output is about 2MB (pad through 1MB CF2). BOOTSEL and copy *-st7789.uf2 to RPI-RP2.
 echo Wait until RPI-RP2 disappears. Do not unplug early.
 pause
 exit /b 0

@@ -90,10 +90,12 @@ class PatchTests(unittest.TestCase):
         self.assertIn("0x10000080", notes["palette"])
         self.assertEqual(bytes(img[0:3]), bytes([0x01, 0x80, 150]))
         self.assertEqual(bytes(img[0x80:0x82]), bytes([0x03, 0x4B]))
-        lut_off = 0x100FE000 - start
+        self.assertIn("LUT at 0x10001000", notes["palette"])
+        lut_off = 0x10001000 - start
         self.assertEqual(bytes(img[lut_off : lut_off + 4]), p.ARCADE_PALETTE_LUT[:4])
         cf2_off = 0x100FF000 - start
         self.assertEqual(struct.unpack_from("<I", img, cf2_off)[0], p.CFG_MAGIC0)
+        self.assertLess(len(img), 0x200000)
 
 
     def test_factory_cf2_uf2_has_magic_at_both_slots(self):
@@ -132,23 +134,33 @@ class PatchTests(unittest.TestCase):
         self.assertIn("ignored 1 non-code hit", notes["palette"])
         self.assertEqual(bytes(firmware[asset : asset + 8]), p.ENC16_SIG)
 
-    def test_e14_fill_is_contiguous_through_2mb(self):
-        flash = {0x10000000: b"\x11" * p.BLOCK, 0x101FF000: b"\x22" * p.BLOCK}
-        fill_to = p.FLASH_BASE + p.FLASH_SIZE_2MB
+    def test_e14_fill_is_contiguous_through_1mb(self):
+        flash = {0x10000000: b"\x11" * p.BLOCK, 0x100FF000: b"\x22" * p.BLOCK}
+        fill_to = p.FLASH_BASE + p.FLASH_SIZE_1MB
         uf2 = p.emit_uf2(flash, p.UF2_RP2040_FAMILY, fill_to=fill_to)
         parsed, family = p.parse_uf2(uf2)
         self.assertEqual(family, p.UF2_RP2040_FAMILY)
         addrs = sorted(parsed)
+        nblocks = p.FLASH_SIZE_1MB // p.BLOCK
         self.assertEqual(addrs[0], 0x10000000)
         self.assertEqual(addrs[-1], fill_to - p.BLOCK)
-        nblocks = p.FLASH_SIZE_2MB // p.BLOCK
         self.assertEqual(len(addrs), nblocks)
         self.assertEqual(len(uf2), nblocks * 512)
-        for i, addr in enumerate(addrs):
-            self.assertEqual(addr, 0x10000000 + i * p.BLOCK)
         self.assertEqual(parsed[0x10000000][0], 0x11)
-        self.assertEqual(parsed[0x101FF000][0], 0x22)
+        self.assertEqual(parsed[0x100FF000][0], 0x22)
         self.assertEqual(parsed[0x10000100], b"\xFF" * p.BLOCK)
+
+    def test_fill_to_skip_cf2_stops_after_firmware(self):
+        img = bytearray(b"\x11" * p.BLOCK + b"\xFF" * p.SECTOR)
+        start = 0x10000000
+        fill = p.compute_fill_to(
+            e14_pad=True, pad_2mb=False, skip_cf2=True, start=start, img=img
+        )
+        self.assertEqual(fill, start + p.SECTOR)
+        fill_1m = p.compute_fill_to(
+            e14_pad=True, pad_2mb=False, skip_cf2=False, start=start, img=img
+        )
+        self.assertEqual(fill_1m, p.FLASH_BASE + p.FLASH_SIZE_1MB)
 
 
 if __name__ == "__main__":

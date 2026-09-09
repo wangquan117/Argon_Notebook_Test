@@ -28,6 +28,7 @@ UF2_MAGIC_START1 = 0x9E5D5157
 UF2_MAGIC_END = 0x0AB16F30
 UF2_RP2040_FAMILY = 0xE48BFF56
 FLASH_BASE = 0x10000000
+FLASH_SIZE_1MB = 1024 * 1024
 FLASH_SIZE_2MB = 2 * 1024 * 1024
 BLOCK = 256
 SECTOR = 4096
@@ -309,6 +310,42 @@ def used_end(start: int, img: bytes) -> int:
     return last
 
 
+def align_up(addr: int, size: int) -> int:
+    return (addr + size - 1) & ~(size - 1)
+
+
+def choose_lut_addr(start: int, img: bytes) -> int:
+    """Put the palette LUT in the next 4 KB sector after the game, not at 1MB.
+
+    Placing it at 0x100FE000 forced a 700 KB 0xFF gap whenever CF2 was omitted.
+    CF2 at 0x100FF000 still requires padding through 1MB when CF2 is included.
+    """
+    lut = align_up(used_end(start, img), SECTOR)
+    cf2_1m = FLASH_BASE + FLASH_SIZE_1MB - SECTOR
+    if lut + SECTOR > cf2_1m:
+        lut = cf2_1m - SECTOR
+    return max(lut, start)
+
+
+def compute_fill_to(
+    *,
+    e14_pad: bool,
+    pad_2mb: bool,
+    skip_cf2: bool,
+    start: int,
+    img: bytes,
+) -> int | None:
+    """Contiguous UF2 end address. Trailing flash may be omitted (RP2040-E14)."""
+    if not e14_pad:
+        return None
+    if pad_2mb:
+        return FLASH_BASE + FLASH_SIZE_2MB
+    if skip_cf2:
+        return max(align_up(used_end(start, img), SECTOR), start + BLOCK)
+    # Runtime getBootloaderConfigData() checks 1MB first and stops on magic.
+    return FLASH_BASE + FLASH_SIZE_1MB
+
+
 def emit_uf2(flash: dict[int, bytes], family: int | None, fill_to: int | None = None) -> bytes:
     addrs = sorted(flash)
     if fill_to is not None:
@@ -352,6 +389,7 @@ def patch_image(
     skip_cf2: bool,
     off_x: int = 0,
     off_y: int = 0,
+    cf2_mbs: tuple[int, ...] = (1,),
 ) -> dict[str, str]:
     notes: dict[str, str] = {}
     rel = bytes(img)
@@ -374,7 +412,7 @@ def patch_image(
             f"0x{start + h:08X}" for h in hits
         )
 
-    lut_addr = 0x100FE000  # 4 KB sector just before the 1 MB CF2 slot
+    lut_addr = choose_lut_addr(start, img)
     if not skip_palette:
         raw_hits = find_all(bytes(img), ENC16_SIG)
         hits = select_thumb_hits(start, raw_hits, init_addrs)
@@ -404,11 +442,13 @@ def patch_image(
             off_x=off_x,
             off_y=off_y,
         )
-        # Arcade looks 4 KB before the end of 1 MB and 2 MB (typical RP2040 sizes).
-        for mb in (1, 2):
+        # getBootloaderConfigData() scans 1MB, 2MB, 4MB... and uses the first magic.
+        slots = []
+        for mb in cf2_mbs:
             addr = FLASH_BASE + mb * 1024 * 1024 - 4096
             write_region(start, img, addr, cf2)
-        notes["cf2"] = "wrote Kubit CF2 at 0x100FF000 and 0x101FF000"
+            slots.append(f"0x{addr:08X}")
+        notes["cf2"] = "wrote Kubit CF2 at " + " and ".join(slots)
 
     notes["used_end"] = f"0x{used_end(start, img):08X}"
     return notes
@@ -492,13 +532,19 @@ def main(argv: list[str] | None = None) -> int:
         dest="e14_pad",
         action="store_true",
         default=True,
-        help="Fill 0xFF from the first flash block through 2MB (RP2040-E14). Default on.",
+        help="Fill 0xFF holes through the CF2 slot (RP2040-E14). Default on.",
     )
     p.add_argument(
         "--no-e14-pad",
         dest="e14_pad",
         action="store_false",
         help="Write a sparse UF2 (small file). Can black-screen on RP2040 ROM UF2 writer.",
+    )
+    p.add_argument(
+        "--pad-2mb",
+        action="store_true",
+        help="Also write CF2 at 2MB and pad through 0x10200000 (~4MB UF2). "
+        "Not needed: Arcade uses the 1MB CF2 slot first.",
     )
     args = p.parse_args(argv)
 
@@ -558,9 +604,16 @@ def main(argv: list[str] | None = None) -> int:
         skip_cf2=args.skip_cf2,
         off_x=args.off_x,
         off_y=args.off_y,
+        cf2_mbs=(1, 2) if args.pad_2mb else (1,),
     )
     new_flash = image_to_flash(start, img)
-    fill_to = FLASH_BASE + FLASH_SIZE_2MB if args.e14_pad else None
+    fill_to = compute_fill_to(
+        e14_pad=args.e14_pad,
+        pad_2mb=args.pad_2mb,
+        skip_cf2=args.skip_cf2,
+        start=start,
+        img=img,
+    )
     out = emit_uf2(new_flash, family or UF2_RP2040_FAMILY, fill_to=fill_to)
     dest = args.output or uf2_path.with_name(uf2_path.stem + "-st7789.uf2")
     dest = dest.expanduser()
@@ -568,11 +621,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"已生成: {dest.resolve()} ({len(out)} bytes)")
     for k, v in notes.items():
         print(f"  {k}: {v}")
-    if args.e14_pad:
+    if fill_to is not None:
         print(
-            "已按 RP2040-E14 填满 0x10000000–0x10200000 的空洞（约 4MB 是正常的）。"
-            "复制到 RPI-RP2 可能要几十秒，等盘符消失再拔。"
+            f"已按 RP2040-E14 连续填充到 0x{fill_to:08X} "
+            f"（UF2 约为 Flash 字节的两倍，因为每 256 字节数据占 512 字节 UF2）。"
+            "复制到 RPI-RP2 请等盘符消失再拔。"
         )
+        if not args.skip_cf2 and not args.pad_2mb:
+            print(
+                "CF2 只写在 1MB 槽 0x100FF000（运行时先查这里就停）。"
+                "不必填满整颗 2MB Flash。若板子上已有 CF2，可用 --skip-cf2 再小一截。"
+            )
     print("请用 BOOTSEL 模式烧录这个新文件，不要再覆盖烧录原来的 arcade-*.uf2。")
     return 0
 
