@@ -45,6 +45,12 @@ py -3 "D:\downlo\patch_uf2.py" --cf2-only -o "D:\downlo\kubit-factory-cf2.uf2" -
 
 日常换游戏：把 MakeCode 的 `.uf2` **拖到 `PATCH_GAME1.bat` 上**（与 `patch_uf2.py` 放在同一目录，例如 `D:\downlo`）。会在旁边生成 `原名-st7789.uf2`，参数固定为已验证的 `--madctl 0x40`。
 
+批处理必须是英文 CRLF。若出现 `'dp0"'` / `'rorlevel'` 乱码，说明下到的是旧版 UTF-8 文件，请重新下载 `PATCH_GAME1.bat`。在 PowerShell 里调用时请用 `cmd /c`：
+
+```powershell
+cmd /c "D:\downlo\PATCH_GAME1.bat" "D:\downlo\arcade-Save-the-Baby-Dinos-2.uf2"
+```
+
 ```powershell
 # 两个文件都放到 D:\downlo 后，把游戏 uf2 拖到 PATCH_GAME1.bat 即可
 Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/wangquan117/Argon_Notebook_Test/cursor/st7789-color-fix-2a90/makecode-arcade-st7789/PATCH_GAME1.bat" -OutFile "D:\downlo\PATCH_GAME1.bat"
