@@ -43,7 +43,13 @@ RP2040 上 Arcade 把硬件配置（CF2）放在 Flash 接近末尾（1MB/2MB �
 py -3 "D:\downlo\patch_uf2.py" --cf2-only -o "D:\downlo\kubit-factory-cf2.uf2" --madctl 0x40
 ```
 
-日常换游戏：对每个新 UF2 执行 `patch_uf2.py ... --madctl 0x40`，只烧生成的 `*-st7789.uf2`。
+日常换游戏：把 MakeCode 的 `.uf2` **拖到 `PATCH_GAME1.bat` 上**（与 `patch_uf2.py` 放在同一目录，例如 `D:\downlo`）。会在旁边生成 `原名-st7789.uf2`，参数固定为已验证的 `--madctl 0x40`。
+
+```powershell
+# 两个文件都放到 D:\downlo 后，把游戏 uf2 拖到 PATCH_GAME1.bat 即可
+Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/wangquan117/Argon_Notebook_Test/cursor/st7789-color-fix-2a90/makecode-arcade-st7789/PATCH_GAME1.bat" -OutFile "D:\downlo\PATCH_GAME1.bat"
+Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/wangquan117/Argon_Notebook_Test/cursor/st7789-color-fix-2a90/makecode-arcade-st7789/patch_uf2.py" -OutFile "D:\downlo\patch_uf2.py"
+```
 
 ## 你这块板的引脚（与原理图一致）
 
