@@ -28,7 +28,11 @@ UF2_MAGIC_START1 = 0x9E5D5157
 UF2_MAGIC_END = 0x0AB16F30
 UF2_RP2040_FAMILY = 0xE48BFF56
 FLASH_BASE = 0x10000000
+FLASH_SIZE_2MB = 2 * 1024 * 1024
 BLOCK = 256
+SECTOR = 4096
+# ENC16 lives in CODAL .text near the ILI init table (PicoPad: 0x10013018 vs 0x10017190).
+PALETTE_NEAR_INIT = 0x20000
 
 ILI9341_SIG = bytes([0xEF, 0x03, 0x03, 0x80, 0x02, 0xCF, 0x03])
 ILI9341_SLOT = 114
@@ -197,6 +201,21 @@ def find_all(haystack: bytes, needle: bytes) -> list[int]:
     return out
 
 
+def select_thumb_hits(start: int, hits: list[int], init_addrs: list[int]) -> list[int]:
+    """Keep Thumb-aligned ENC16 sites in .text; ignore the same 8 bytes in assets."""
+    even = [h for h in hits if ((start + h) & 1) == 0]
+    if init_addrs:
+        near = [
+            h
+            for h in even
+            if any(abs((start + h) - ia) <= PALETTE_NEAR_INIT for ia in init_addrs)
+        ]
+        if near:
+            return near
+    runtime = [h for h in even if (start + h) < FLASH_BASE + 0xC0000]
+    return runtime or even
+
+
 def build_st7789_init(*, invert: bool, madctl: int) -> bytes:
     seq = bytearray(ST7789_INIT_PREFIX)
     # offsets: MADCTL data at index of 0x36, 0x01, VALUE
@@ -293,7 +312,10 @@ def used_end(start: int, img: bytes) -> int:
 def emit_uf2(flash: dict[int, bytes], family: int | None, fill_to: int | None = None) -> bytes:
     addrs = sorted(flash)
     if fill_to is not None:
-        # RP2040-E14: avoid sparse UF2 holes; write 0xFF for empty sectors up to fill_to.
+        # RP2040-E14: ROM UF2 writer corrupts partially-filled 4 KB sectors and
+        # any hole except trailing unwritten flash (datasheet 2.8.4.2). PicoPad
+        # pad 0xFF from the first payload address through CF2; a 632 KB sparse
+        # file blacks out some games even when the same patches print OK.
         filled: dict[int, bytes] = {}
         addr = addrs[0]
         while addr < fill_to:
@@ -333,6 +355,7 @@ def patch_image(
 ) -> dict[str, str]:
     notes: dict[str, str] = {}
     rel = bytes(img)
+    init_addrs: list[int] = []
 
     if not skip_init:
         hits = find_all(rel, ILI9341_SIG)
@@ -346,13 +369,15 @@ def patch_image(
             if off + ILI9341_SLOT > len(img):
                 continue
             img[off : off + ILI9341_SLOT] = init
+            init_addrs.append(start + off)
         notes["ili9341_init"] = f"patched {len(hits)} site(s) at " + ", ".join(
             f"0x{start + h:08X}" for h in hits
         )
 
     lut_addr = 0x100FE000  # 4 KB sector just before the 1 MB CF2 slot
     if not skip_palette:
-        hits = find_all(bytes(img), ENC16_SIG)
+        raw_hits = find_all(bytes(img), ENC16_SIG)
+        hits = select_thumb_hits(start, raw_hits, init_addrs)
         if not hits:
             raise SystemExit(
                 "ENC16 palette loop signature 4B 01 0B 43 CC 10 04 43 not found. "
@@ -361,9 +386,15 @@ def patch_image(
         stub = build_palette_stub(lut_addr)
         for off in hits:
             img[off : off + ENC16_LOOP_LEN] = stub
-        lut_sector = ARCADE_PALETTE_LUT + b"\xFF" * (4096 - LUT_LEN)
+        lut_sector = ARCADE_PALETTE_LUT + b"\xFF" * (SECTOR - LUT_LEN)
         write_region(start, img, lut_addr, lut_sector)
-        notes["palette"] = f"patched {len(hits)} site(s); LUT at 0x{lut_addr:08X}"
+        dropped = len(raw_hits) - len(hits)
+        extra = f"; ignored {dropped} non-code hit(s)" if dropped else ""
+        notes["palette"] = (
+            f"patched {len(hits)} site(s) at "
+            + ", ".join(f"0x{start + h:08X}" for h in hits)
+            + f"; LUT at 0x{lut_addr:08X}{extra}"
+        )
 
     if not skip_cf2:
         cf2 = build_cf2(
@@ -458,8 +489,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument(
         "--e14-pad",
+        dest="e14_pad",
         action="store_true",
-        help="Fill 0xFF gaps up to 2MB (RP2040-E14 workaround; much larger UF2)",
+        default=True,
+        help="Fill 0xFF from the first flash block through 2MB (RP2040-E14). Default on.",
+    )
+    p.add_argument(
+        "--no-e14-pad",
+        dest="e14_pad",
+        action="store_false",
+        help="Write a sparse UF2 (small file). Can black-screen on RP2040 ROM UF2 writer.",
     )
     args = p.parse_args(argv)
 
@@ -521,7 +560,7 @@ def main(argv: list[str] | None = None) -> int:
         off_y=args.off_y,
     )
     new_flash = image_to_flash(start, img)
-    fill_to = FLASH_BASE + 2 * 1024 * 1024 if args.e14_pad else None
+    fill_to = FLASH_BASE + FLASH_SIZE_2MB if args.e14_pad else None
     out = emit_uf2(new_flash, family or UF2_RP2040_FAMILY, fill_to=fill_to)
     dest = args.output or uf2_path.with_name(uf2_path.stem + "-st7789.uf2")
     dest = dest.expanduser()
@@ -529,6 +568,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"已生成: {dest.resolve()} ({len(out)} bytes)")
     for k, v in notes.items():
         print(f"  {k}: {v}")
+    if args.e14_pad:
+        print(
+            "已按 RP2040-E14 填满 0x10000000–0x10200000 的空洞（约 4MB 是正常的）。"
+            "复制到 RPI-RP2 可能要几十秒，等盘符消失再拔。"
+        )
     print("请用 BOOTSEL 模式烧录这个新文件，不要再覆盖烧录原来的 arcade-*.uf2。")
     return 0
 

@@ -87,6 +87,7 @@ class PatchTests(unittest.TestCase):
             skip_cf2=False,
         )
         self.assertIn("patched", notes["ili9341_init"])
+        self.assertIn("0x10000080", notes["palette"])
         self.assertEqual(bytes(img[0:3]), bytes([0x01, 0x80, 150]))
         self.assertEqual(bytes(img[0x80:0x82]), bytes([0x03, 0x4B]))
         lut_off = 0x100FE000 - start
@@ -107,6 +108,47 @@ class PatchTests(unittest.TestCase):
         self.assertEqual(p.pack_cfg0(0x40, off_y=80), 0x500040)
         self.assertEqual(0xA0 & 0x20, 0x20)
         self.assertEqual(0x40 & 0x20, 0)
+
+    def test_palette_ignores_asset_false_positive(self):
+        firmware = bytearray(0x30000)
+        firmware[0:7] = p.ILI9341_SIG
+        firmware[7:114] = b"\xAA" * (114 - 7)
+        firmware[0x80:0x88] = p.ENC16_SIG
+        firmware[0x80 + 8 : 0x80 + 30] = b"\x11" * 22
+        asset = 0x28000
+        firmware[asset : asset + 8] = p.ENC16_SIG
+        start = 0x10000000
+        notes = p.patch_image(
+            start,
+            firmware,
+            madctl=0x40,
+            invert=True,
+            spi_mhz=40,
+            skip_init=False,
+            skip_palette=False,
+            skip_cf2=True,
+        )
+        self.assertIn("0x10000080", notes["palette"])
+        self.assertIn("ignored 1 non-code hit", notes["palette"])
+        self.assertEqual(bytes(firmware[asset : asset + 8]), p.ENC16_SIG)
+
+    def test_e14_fill_is_contiguous_through_2mb(self):
+        flash = {0x10000000: b"\x11" * p.BLOCK, 0x101FF000: b"\x22" * p.BLOCK}
+        fill_to = p.FLASH_BASE + p.FLASH_SIZE_2MB
+        uf2 = p.emit_uf2(flash, p.UF2_RP2040_FAMILY, fill_to=fill_to)
+        parsed, family = p.parse_uf2(uf2)
+        self.assertEqual(family, p.UF2_RP2040_FAMILY)
+        addrs = sorted(parsed)
+        self.assertEqual(addrs[0], 0x10000000)
+        self.assertEqual(addrs[-1], fill_to - p.BLOCK)
+        nblocks = p.FLASH_SIZE_2MB // p.BLOCK
+        self.assertEqual(len(addrs), nblocks)
+        self.assertEqual(len(uf2), nblocks * 512)
+        for i, addr in enumerate(addrs):
+            self.assertEqual(addr, 0x10000000 + i * p.BLOCK)
+        self.assertEqual(parsed[0x10000000][0], 0x11)
+        self.assertEqual(parsed[0x101FF000][0], 0x22)
+        self.assertEqual(parsed[0x10000100], b"\xFF" * p.BLOCK)
 
 
 if __name__ == "__main__":

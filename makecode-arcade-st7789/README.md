@@ -144,11 +144,16 @@ py -3 .\patch_uf2.py .\arcade-Avoid-the-Fans-2.uf2
 当前目录: D:\downlo
 Python: C:\...\python.exe (3.12.x)
 读取: D:\downlo\arcade-Avoid-the-Fans-2.uf2 (...... bytes)
-已生成: D:\downlo\arcade-Avoid-the-Fans-2-st7789.uf2 (...... bytes)
+已生成: D:\downlo\arcade-Avoid-the-Fans-2-st7789.uf2 (约 4194304 bytes)
   ili9341_init: patched 1 site(s) ...
-  palette: patched 1 site(s); LUT at 0x100FE000
+  palette: patched 1 site(s) at 0x10013xxx; LUT at 0x100FE000
   cf2: wrote Kubit CF2 ...
+已按 RP2040-E14 填满空洞（约 4MB 是正常的）
 ```
+
+**补丁后大约 4MB 是对的。** 旧脚本生成约 632KB 的稀疏 UF2，Flash 中间有空洞。RP2040 ROM 有 E14 问题：非连续 UF2 会写坏未填满的 4KB 扇区，表现就是**烧录后黑屏、完全没反应**；同一游戏的 MakeCode 原件在酷比特上能跑，因为原件本身是连续写入的。Avoid the Fans 偶尔能亮，只是它的最后一扇区碰巧写对了，不能当所有游戏都安全。
+
+复制到 `RPI-RP2` 可能要几十秒，**等盘符自己消失**再拔线。
 
 然后确认新文件：
 
@@ -176,6 +181,7 @@ Get-ChildItem D:\downlo\*-st7789.uf2
 | `ENC16 palette loop signature ... not found` | Arcade 运行时版本变了，把完整报错发回来。 |
 | 颜色对、画面转 90°、左边约 1/4 雪花 | `0xA0` 的 MV 位冲突。改用 `--madctl 0x40`（或 `0x80` / `0xC0` / `0x00`，都不要带 `0x20`）。 |
 | 生成了 uf2 仍发绿 | 确认烧的是 `*-st7789.uf2`。再试 `--madctl 0x48` 或 `--no-invert`。 |
+| 补丁成功但板子全黑 | 必须用新脚本（输出约 **4MB**）。旧的 632KB `*-st7789.uf2` 有 Flash 空洞。不要用 `--no-e14-pad`。 |
 
 
 若方向反了或红蓝反了，改 MADCTL 再打一次补丁（不必改脚本里的引脚）。
